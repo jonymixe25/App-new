@@ -1,0 +1,5 @@
+{
+  "name": "Live Stream App",
+  "description": "Aplicación para transmitir video en vivo desde la cámara y micrófono, y poder incrustarlo en cualquier página web.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
