@@ -206,8 +206,10 @@ export default function Broadcast() {
   };
 
   useEffect(() => {
-    const s = io(window.location.origin, {
-      transports: ['polling', 'websocket'],
+    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    
+    const s = io(socketUrl, {
+      transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
     });
