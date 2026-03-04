@@ -509,8 +509,8 @@ export default function Broadcast() {
       
       {/* Top Header with User Info */}
       {!isStreaming && (
-        <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
-          <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-center z-20">
+          <div className="absolute left-0 flex items-center gap-3 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
             <div className="w-8 h-8 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center">
               <UserIcon className="w-4 h-4" />
             </div>
