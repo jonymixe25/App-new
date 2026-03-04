@@ -3,6 +3,8 @@ import Home from "./pages/Home";
 import Broadcast from "./pages/Broadcast";
 import View from "./pages/View";
 import Recordings from "./pages/Recordings";
+import AdminNews from "./pages/AdminNews";
+import Auth from "./pages/Auth";
 import Navbar from "./components/Navbar";
 
 export default function App() {
@@ -17,6 +19,8 @@ export default function App() {
             <Route path="/view" element={<View />} />
             <Route path="/vista" element={<View />} />
             <Route path="/recordings" element={<Recordings />} />
+            <Route path="/admin-news" element={<AdminNews />} />
+            <Route path="/auth" element={<Auth />} />
           </Routes>
         </main>
       </div>

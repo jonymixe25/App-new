@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, Check, RefreshCw, Facebook, Share2, Users } from "lucide-react";
+import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, Check, RefreshCw, Facebook, Share2, Users, Camera } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 import Chat from "../components/Chat";
 import { getSocketUrl } from "../utils/socket";
 
@@ -19,6 +20,7 @@ const config = {
 
 export default function View() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const privateVideoRef = useRef<HTMLVideoElement>(null); // Video para la llamada privada
   const [socket, setSocket] = useState<Socket | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
@@ -37,6 +39,7 @@ export default function View() {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [broadcasters, setBroadcasters] = useState<Broadcaster[]>([]);
   const [selectedBroadcasterId, setSelectedBroadcasterId] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
   // Sound ref
   const notificationSound = useRef<HTMLAudioElement | null>(null);
@@ -58,7 +61,10 @@ export default function View() {
     if (!socket) return;
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: facingMode }, 
+        audio: true 
+      });
       setPrivateStream(stream);
       
       const pc = new RTCPeerConnection(config);
@@ -107,6 +113,40 @@ export default function View() {
     setIsPrivateCallActive(false);
   };
 
+  const flipPrivateCamera = async () => {
+    if (!privateStream || !isPrivateCallActive) return;
+    
+    const newFacingMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newFacingMode);
+    
+    try {
+      // Stop current video tracks
+      privateStream.getVideoTracks().forEach(track => track.stop());
+      
+      const newVideoStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: newFacingMode
+        }
+      });
+      
+      const newVideoTrack = newVideoStream.getVideoTracks()[0];
+      
+      // Update local private stream
+      const combinedStream = new MediaStream([newVideoTrack, ...privateStream.getAudioTracks()]);
+      setPrivateStream(combinedStream);
+      
+      // Replace track in peer connection
+      if (privatePeerConnection.current) {
+        const sender = privatePeerConnection.current.getSenders().find(s => s.track?.kind === "video");
+        if (sender) {
+          sender.replaceTrack(newVideoTrack);
+        }
+      }
+    } catch (err) {
+      console.error("Error flipping private camera:", err);
+    }
+  };
+
   const shareToFacebook = () => {
     const url = window.location.href;
     window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
@@ -129,6 +169,12 @@ export default function View() {
       socket.emit("watcher", id);
     }
   };
+
+  useEffect(() => {
+    if (privateVideoRef.current && privateStream) {
+      privateVideoRef.current.srcObject = privateStream;
+    }
+  }, [privateStream]);
 
   useEffect(() => {
     const socketUrl = getSocketUrl();
@@ -309,6 +355,10 @@ export default function View() {
 
   return (
     <div className="relative w-full h-[calc(100vh-64px)] bg-black text-zinc-50 overflow-hidden">
+      <Helmet>
+        <title>Ver Transmisión en Vivo | Vida Mixe TV</title>
+        <meta name="description" content="Mira las transmisiones en vivo de la comunidad Mixe. Únete al chat y participa en la conversación." />
+      </Helmet>
       <div className="absolute inset-0 bg-black flex items-center justify-center">
         <video
           ref={videoRef}
@@ -353,11 +403,35 @@ export default function View() {
             <Phone className="w-4 h-4 text-white" />
             <span className="text-sm font-medium text-white">En llamada privada con el anfitrión</span>
             <button 
-              onClick={endPrivateCall}
+              onClick={flipPrivateCamera}
               className="ml-2 p-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+              title="Voltear Cámara"
             >
-              <X className="w-3 h-3" />
+              <Camera className="w-3 h-3 text-white" />
             </button>
+            <button 
+              onClick={endPrivateCall}
+              className="ml-1 p-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+            >
+              <X className="w-3 h-3 text-white" />
+            </button>
+          </div>
+        )}
+
+        {/* Private Call Local Video Overlay */}
+        {isPrivateCallActive && (
+          <div className="absolute bottom-24 right-4 w-48 h-36 bg-zinc-900 rounded-xl border border-zinc-700 shadow-2xl overflow-hidden z-30">
+             <video
+                ref={privateVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover"
+             />
+             <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
+               <Users className="w-3 h-3 text-emerald-400" />
+               Tú
+             </div>
           </div>
         )}
 

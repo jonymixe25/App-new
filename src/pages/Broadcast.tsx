@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X, Circle, Square, Save, RefreshCw } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X, Circle, Square, Save, RefreshCw, Camera, LogOut, User as UserIcon } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 import Chat from "../components/Chat";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { saveRecording } from "../utils/videoStorage";
 import { getSocketUrl } from "../utils/socket";
 
@@ -13,12 +14,36 @@ const config = {
   ]
 };
 
-interface User {
+interface BroadcasterUser {
   id: string;
   username: string;
 }
 
+interface AuthUser {
+  id: string;
+  username: string;
+  name: string;
+}
+
 export default function Broadcast() {
+  const navigate = useNavigate();
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("broadcaster_user");
+    if (!storedUser) {
+      navigate("/auth");
+    } else {
+      setAuthUser(JSON.parse(storedUser));
+    }
+    setIsCheckingAuth(false);
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("broadcaster_user");
+    navigate("/auth");
+  };
   const videoRef = useRef<HTMLVideoElement>(null);
   const privateVideoRef = useRef<HTMLVideoElement>(null); // Video para la llamada privada
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -28,7 +53,7 @@ export default function Broadcast() {
   
   // Private Call Refs
   const privatePeerConnection = useRef<RTCPeerConnection | null>(null);
-  const [privateCallUser, setPrivateCallUser] = useState<User | null>(null);
+  const [privateCallUser, setPrivateCallUser] = useState<BroadcasterUser | null>(null);
   const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
   
   // Recording State
@@ -40,7 +65,7 @@ export default function Broadcast() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewers, setViewers] = useState(0);
-  const [connectedUsers, setConnectedUsers] = useState<User[]>([]);
+  const [connectedUsers, setConnectedUsers] = useState<BroadcasterUser[]>([]);
   const [uptime, setUptime] = useState(0);
   const [showChat, setShowChat] = useState(true);
   const [showUserList, setShowUserList] = useState(false);
@@ -50,6 +75,7 @@ export default function Broadcast() {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
   const [streamName, setStreamName] = useState("");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
   // Sound ref
   const notificationSound = useRef<HTMLAudioElement | null>(null);
@@ -84,7 +110,7 @@ export default function Broadcast() {
   };
 
   // Private Call Functions
-  const startPrivateCall = async (user: User) => {
+  const startPrivateCall = async (user: BroadcasterUser) => {
     if (!stream || !socket) return;
     
     setPrivateCallUser(user);
@@ -240,7 +266,7 @@ export default function Broadcast() {
       setViewers(count);
     });
 
-    s.on("user_list", (users: User[]) => {
+    s.on("user_list", (users: BroadcasterUser[]) => {
       setConnectedUsers(users);
     });
 
@@ -347,7 +373,8 @@ export default function Broadcast() {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280 },
-          height: { ideal: 720 }
+          height: { ideal: 720 },
+          facingMode: facingMode
         },
         audio: true
       });
@@ -406,10 +433,103 @@ export default function Broadcast() {
     }
   };
 
+  const flipCamera = async () => {
+    const newFacingMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newFacingMode);
+    
+    // If we have an active stream (either preview or live), we need to refresh it
+    if (stream) {
+      try {
+        // Stop current video tracks
+        stream.getVideoTracks().forEach(track => track.stop());
+        
+        const newVideoStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: newFacingMode
+          }
+        });
+        
+        const newVideoTrack = newVideoStream.getVideoTracks()[0];
+        
+        // Update local video element
+        if (videoRef.current) {
+          videoRef.current.srcObject = new MediaStream([newVideoTrack, ...stream.getAudioTracks()]);
+        }
+        
+        // If we are live, replace track in all peer connections
+        if (isStreaming) {
+          (Object.values(peerConnections.current) as RTCPeerConnection[]).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track?.kind === "video");
+            if (sender) {
+              sender.replaceTrack(newVideoTrack);
+            }
+          });
+          
+          // Update private call if active
+          if (privatePeerConnection.current) {
+            const sender = privatePeerConnection.current.getSenders().find(s => s.track?.kind === "video");
+            if (sender) {
+              sender.replaceTrack(newVideoTrack);
+            }
+          }
+        }
+        
+        // Update stream state
+        const combinedStream = new MediaStream([
+          newVideoTrack,
+          ...stream.getAudioTracks()
+        ]);
+        setStream(combinedStream);
+        
+      } catch (err) {
+        console.error("Error flipping camera:", err);
+        setError("No se pudo cambiar la cámara.");
+      }
+    }
+  };
+
   // ... (Authentication render logic remains the same)
   
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-stone-950 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-[calc(100vh-64px)] bg-black text-zinc-50 overflow-hidden">
+      <Helmet>
+        <title>Transmitir en Vivo | Vida Mixe TV</title>
+        <meta name="description" content="Panel de control para transmisiones en vivo. Comparte tu cultura y tradiciones con el mundo." />
+      </Helmet>
+      
+      {/* Top Header with User Info */}
+      {!isStreaming && (
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-20">
+          <div className="flex items-center gap-3 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <div className="w-8 h-8 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center">
+              <UserIcon className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Locutor</span>
+              <span className="text-xs font-medium text-white">{authUser?.name}</span>
+            </div>
+          </div>
+          
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 px-4 py-2 rounded-full border border-red-500/20 transition-all text-xs font-medium"
+          >
+            <LogOut className="w-4 h-4" />
+            Cerrar Sesión
+          </button>
+        </div>
+      )}
+
       <div className="absolute inset-0 bg-black flex items-center justify-center">
         <video
           ref={videoRef}
@@ -484,12 +604,21 @@ export default function Broadcast() {
                     Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
                   </p>
                 </div>
-                <button
-                  onClick={startStream}
-                  className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
-                >
-                  Iniciar Transmisión
-                </button>
+                <div className="flex gap-4">
+                  <button
+                    onClick={startStream}
+                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
+                  >
+                    Iniciar Transmisión
+                  </button>
+                  <button
+                    onClick={flipCamera}
+                    className="p-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors border border-zinc-700"
+                    title="Voltear Cámara"
+                  >
+                    <Camera className="w-6 h-6" />
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -538,8 +667,16 @@ export default function Broadcast() {
               <button
                 onClick={toggleAudio}
                 className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                title={audioEnabled ? "Silenciar Micrófono" : "Activar Micrófono"}
               >
                 {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+              </button>
+              <button
+                onClick={flipCamera}
+                className="p-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full transition-colors"
+                title="Voltear Cámara"
+              >
+                <Camera className="w-6 h-6" />
               </button>
               <button
                 onClick={stopStream}

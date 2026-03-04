@@ -1,10 +1,33 @@
 import { Link } from "react-router-dom";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare } from "lucide-react";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { useEffect, useState } from "react";
 import LivePreview from "../components/LivePreview";
 
+interface NewsItem {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  author: string;
+}
+
 export default function Home() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/news")
+      .then(res => res.json())
+      .then(data => setNews(data))
+      .catch(err => console.error("Error fetching news:", err));
+  }, []);
+
   return (
     <div className="min-h-screen bg-stone-900 text-stone-50 flex flex-col font-sans">
+      <Helmet>
+        <title>Vida Mixe TV | Inicio - La Región de los Jamás Conquistados</title>
+        <meta name="description" content="Conectando a la comunidad Ayuuk con el mundo. Transmisiones en vivo desde el corazón de la sierra de Oaxaca." />
+      </Helmet>
       {/* Hero Section */}
       <div className="relative min-h-[80vh] flex items-center justify-center overflow-hidden py-20">
         <div className="absolute inset-0 z-0">
@@ -52,8 +75,93 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Content Section */}
-      <div className="flex-1 bg-stone-900 py-16 px-6">
+      {/* Tlahuitoltepec Section */}
+      <div className="bg-stone-950 py-24 px-6">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1 relative">
+            <div className="absolute -inset-4 bg-emerald-500/10 blur-2xl rounded-full"></div>
+            <img 
+              src="https://picsum.photos/seed/tlahuitoltepec/800/600" 
+              alt="Santa María Tlahuitoltepec" 
+              className="relative rounded-3xl shadow-2xl border border-stone-800"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="order-1 lg:order-2 space-y-6">
+            <div className="flex items-center gap-2 text-emerald-400 font-semibold uppercase tracking-widest text-sm">
+              <MapPin className="w-4 h-4" />
+              <span>Destacado de la Sierra</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">Santa María Tlahuitoltepec</h2>
+            <p className="text-lg text-stone-400 leading-relaxed">
+              Cuna de músicos y corazón de la cultura Ayuuk. Tlahuitoltepec es mundialmente reconocido por el **CECAM** (Centro de Capacitación Musical y Desarrollo de la Cultura Mixe), donde la música de banda se convierte en el alma del pueblo.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-6 pt-4">
+              <div className="flex gap-4">
+                <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Music className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold">Tradición Musical</h4>
+                  <p className="text-sm text-stone-500">Hogar de las bandas de viento más emblemáticas.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-10 h-10 bg-amber-500/20 text-amber-400 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Mountain className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold">Identidad Ayuuk</h4>
+                  <p className="text-sm text-stone-500">Preservando la lengua y el orgullo indígena.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* News Section */}
+      <div className="bg-stone-900 py-24 px-6 border-t border-stone-800">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-end justify-between mb-12">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-indigo-400 font-semibold uppercase tracking-widest text-sm">
+                <Newspaper className="w-4 h-4" />
+                <span>Actualidad</span>
+              </div>
+              <h2 className="text-4xl font-bold text-white">Noticias Comunitarias</h2>
+            </div>
+            <Link to="/admin-news" className="text-stone-500 hover:text-white text-sm transition-colors">
+              Acceso Admin
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {news.length > 0 ? (
+              news.map((item) => (
+                <div key={item.id} className="bg-stone-800/40 border border-stone-700/50 rounded-2xl p-8 hover:border-emerald-500/30 transition-all group">
+                  <div className="text-xs text-stone-500 mb-4 flex items-center gap-2">
+                    <span>{new Date(item.date).toLocaleDateString()}</span>
+                    <span>•</span>
+                    <span>Por {item.author}</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-4 group-hover:text-emerald-400 transition-colors">{item.title}</h3>
+                  <p className="text-stone-400 text-sm leading-relaxed line-clamp-3">
+                    {item.content}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center py-12 text-stone-500">
+                No hay noticias publicadas en este momento.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Features Section */}
+      <div className="bg-stone-950 py-24 px-6 border-t border-stone-800">
         <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
           {/* Card 1 */}
           <div className="bg-stone-800/50 border border-stone-700/50 rounded-2xl p-8 hover:bg-stone-800 transition-colors group">

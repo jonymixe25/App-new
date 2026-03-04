@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  app.use(express.json()); // Add this for POST bodies
   const PORT = parseInt(process.env.PORT || "3000", 10);
   const httpServer = createServer(app);
   
@@ -19,6 +20,22 @@ async function startServer() {
       methods: ["GET", "POST"]
     }
   });
+
+  // News storage
+  let news: any[] = [
+    {
+      id: "1",
+      title: "Bienvenidos a Vida Mixe TV",
+      content: "Iniciamos transmisiones para conectar a la comunidad Ayuuk con el mundo. Sintoniza nuestras transmisiones en vivo desde la Sierra Norte.",
+      date: new Date().toISOString(),
+      author: "Admin"
+    }
+  ];
+
+  // User storage for broadcasters
+  let broadcasters_accounts: any[] = [
+    { id: "1", username: "admin", password: "password123", name: "Administrador" }
+  ];
 
   // Almacenar broadcasters: socket.id -> { id, name, viewers }
   const broadcasters = new Map<string, { id: string, name: string, viewers: number }>();
@@ -122,6 +139,62 @@ async function startServer() {
   // API routes FIRST
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  app.get("/api/news", (req, res) => {
+    res.json(news);
+  });
+
+  app.post("/api/news", (req, res) => {
+    const { title, content, author, password } = req.body;
+    // Simple password check for admin
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    const newEntry = {
+      id: Date.now().toString(),
+      title,
+      content,
+      author: author || "Admin",
+      date: new Date().toISOString()
+    };
+    news.unshift(newEntry);
+    res.json(newEntry);
+  });
+
+  app.delete("/api/news/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    news = news.filter(n => n.id !== id);
+    res.json({ success: true });
+  });
+
+  // Auth endpoints
+  app.post("/api/auth/register", (req, res) => {
+    const { username, password, name } = req.body;
+    if (broadcasters_accounts.find(u => u.username === username)) {
+      return res.status(400).json({ error: "El usuario ya existe" });
+    }
+    const newUser = {
+      id: Date.now().toString(),
+      username,
+      password, // In a real app, hash this!
+      name: name || username
+    };
+    broadcasters_accounts.push(newUser);
+    res.json({ success: true, user: { id: newUser.id, username: newUser.username, name: newUser.name } });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const { username, password } = req.body;
+    const user = broadcasters_accounts.find(u => u.username === username && u.password === password);
+    if (!user) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+    res.json({ success: true, user: { id: user.id, username: user.username, name: user.name } });
   });
 
   // Vite middleware for development

@@ -8,6 +8,7 @@ export default function Navbar() {
     { path: "/", label: "Inicio", icon: Home },
     { path: "/view", label: "Ver", icon: MonitorPlay },
     { path: "/recordings", label: "Grabaciones", icon: Library },
+    { path: "/admin", label: "Transmitir", icon: Video },
   ];
 
   return (
