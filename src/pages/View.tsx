@@ -27,6 +27,22 @@ export default function View() {
   const [streamEnded, setStreamEnded] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const [socketError, setSocketError] = useState<string | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  // Sound ref
+  const notificationSound = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    notificationSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3");
+    notificationSound.current.volume = 0.5;
+  }, []);
+
+  const playNotification = () => {
+    if (notificationSound.current) {
+      notificationSound.current.currentTime = 0;
+      notificationSound.current.play().catch(e => console.log("Audio play failed", e));
+    }
+  };
 
   // Handle Private Call
   const acceptPrivateCall = async () => {
@@ -105,6 +121,13 @@ export default function View() {
     s.on("broadcaster", () => {
       setStreamEnded(false);
       s.emit("watcher");
+    });
+
+    s.on("chat_message", (message: any) => {
+      if (!showChat) {
+        setUnreadMessages(prev => prev + 1);
+        playNotification();
+      }
     });
 
     // Private Call Logic
@@ -353,10 +376,18 @@ export default function View() {
       </div>
 
       <button
-        onClick={() => setShowChat(!showChat)}
-        className="absolute top-4 right-4 z-50 p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
+        onClick={() => {
+          setShowChat(!showChat);
+          if (!showChat) setUnreadMessages(0);
+        }}
+        className="absolute top-4 right-4 z-50 p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg relative"
       >
         <MessageSquare className="w-6 h-6" />
+        {!showChat && unreadMessages > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
+            {unreadMessages > 9 ? '9+' : unreadMessages}
+          </span>
+        )}
       </button>
 
       <div 

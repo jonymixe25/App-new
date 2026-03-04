@@ -27,7 +27,7 @@ export default function Home() {
                 Inicia la transmisión desde tu cámara y micrófono. Solo puede haber un transmisor a la vez.
               </p>
               <Link
-                to="/broadcast"
+                to="/admin"
                 className="inline-flex items-center justify-center w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors"
               >
                 Iniciar Transmisión
@@ -45,7 +45,7 @@ export default function Home() {
                 Mira la transmisión en vivo. Puedes compartir este enlace o incrustarlo en tu web.
               </p>
               <Link
-                to="/view"
+                to="/"
                 className="inline-flex items-center justify-center w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-colors"
               >
                 Ver Transmisión

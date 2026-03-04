@@ -36,9 +36,25 @@ export default function Broadcast() {
   const [showChat, setShowChat] = useState(true);
   const [showUserList, setShowUserList] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
+
+  // Sound ref
+  const notificationSound = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    notificationSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3");
+    notificationSound.current.volume = 0.5;
+  }, []);
+
+  const playNotification = () => {
+    if (notificationSound.current) {
+      notificationSound.current.currentTime = 0;
+      notificationSound.current.play().catch(e => console.log("Audio play failed", e));
+    }
+  };
 
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -46,7 +62,7 @@ export default function Broadcast() {
   const handleShare = async () => {
     const currentOrigin = window.location.origin;
     const sharedOrigin = currentOrigin.replace('ais-dev', 'ais-pre');
-    const viewerUrl = `${sharedOrigin}/vista`;
+    const viewerUrl = `${sharedOrigin}/`;
     
     try {
       await navigator.clipboard.writeText(viewerUrl);
@@ -175,6 +191,13 @@ export default function Broadcast() {
     s.on("private_candidate", (id: string, candidate: RTCIceCandidateInit) => {
       if (privatePeerConnection.current) {
         privatePeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
+      }
+    });
+
+    s.on("chat_message", (message: any) => {
+      if (!showChat) {
+        setUnreadMessages(prev => prev + 1);
+        playNotification();
       }
     });
 
@@ -449,10 +472,18 @@ export default function Broadcast() {
           {copied ? <Check className="w-6 h-6 text-emerald-400" /> : <Share2 className="w-6 h-6" />}
         </button>
         <button
-          onClick={() => setShowChat(!showChat)}
-          className={`p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showChat ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-black/50 hover:bg-black/70'}`}
+          onClick={() => {
+            setShowChat(!showChat);
+            if (!showChat) setUnreadMessages(0);
+          }}
+          className={`relative p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showChat ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-black/50 hover:bg-black/70'}`}
         >
           <MessageSquare className="w-6 h-6" />
+          {!showChat && unreadMessages > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
+              {unreadMessages > 9 ? '9+' : unreadMessages}
+            </span>
+          )}
         </button>
       </div>
 

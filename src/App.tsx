@@ -7,10 +7,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/broadcast" element={<Broadcast />} />
-        <Route path="/view" element={<View />} />
-        <Route path="/vista" element={<View />} />
+        <Route path="/" element={<View />} />
+        <Route path="/admin" element={<Broadcast />} />
+        <Route path="/home" element={<Home />} />
       </Routes>
     </BrowserRouter>
   );
