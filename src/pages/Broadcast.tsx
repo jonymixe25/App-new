@@ -43,21 +43,6 @@ export default function Broadcast() {
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
 
-  // ... (Authentication state remains the same)
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [authError, setAuthError] = useState(false);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === "vidamixe" || passwordInput === "admin") {
-      setIsAuthenticated(true);
-      setAuthError(false);
-    } else {
-      setAuthError(true);
-    }
-  };
-
   const handleShare = async () => {
     const currentOrigin = window.location.origin;
     const sharedOrigin = currentOrigin.replace('ais-dev', 'ais-pre');
@@ -331,54 +316,7 @@ export default function Broadcast() {
   };
 
   // ... (Authentication render logic remains the same)
-  if (!isAuthenticated) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 text-zinc-50 p-4">
-        <div className="w-full max-w-md bg-zinc-900/50 border border-zinc-800 rounded-2xl p-8 shadow-xl backdrop-blur-sm">
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-4">
-              <Video className="w-8 h-8" />
-            </div>
-            <h1 className="text-2xl font-bold text-center">Acceso a Transmisión</h1>
-            <p className="text-zinc-400 text-center mt-2">
-              Ingresa la contraseña para iniciar una transmisión como usuario único.
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Contraseña de acceso"
-                className="w-full px-4 py-3 bg-zinc-950 border border-zinc-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all text-white placeholder-zinc-600"
-                autoFocus
-              />
-              {authError && (
-                <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> Contraseña incorrecta
-                </p>
-              )}
-            </div>
-            <button
-              type="submit"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
-            >
-              Ingresar
-            </button>
-          </form>
-          
-          <div className="mt-8 pt-6 border-t border-white/5 text-center">
-             <p className="text-xs text-zinc-500">
-               Solo el administrador autorizado puede acceder a esta página.
-             </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  
   return (
     <div className="relative w-full h-screen bg-black text-zinc-50 overflow-hidden">
       <div className="absolute inset-0 bg-black flex items-center justify-center">
