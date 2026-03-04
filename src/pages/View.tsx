@@ -116,7 +116,7 @@ export default function View() {
 
     s.on("connect_error", (err) => {
       setIsConnected(false);
-      setSocketError(`Error de conexión: ${err.message}`);
+      setSocketError(`Error al conectar con ${socketUrl}: ${err.message}`);
       console.error("Socket connection error:", err);
     });
 

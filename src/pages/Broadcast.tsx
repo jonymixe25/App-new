@@ -225,7 +225,7 @@ export default function Broadcast() {
 
     s.on("connect_error", (err) => {
       setIsSocketConnected(false);
-      setSocketError(`Error de conexión: ${err.message}`);
+      setSocketError(`Error al conectar con ${socketUrl}: ${err.message}`);
       console.error("Socket connection error:", err);
     });
 
