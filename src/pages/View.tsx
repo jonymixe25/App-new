@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff } from "lucide-react";
+import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, Check } from "lucide-react";
 import Chat from "../components/Chat";
 
 const config = {
@@ -16,11 +16,71 @@ export default function View() {
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   
+  // Private Call State
+  const [incomingCall, setIncomingCall] = useState(false);
+  const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
+  const privatePeerConnection = useRef<RTCPeerConnection | null>(null);
+  const [privateStream, setPrivateStream] = useState<MediaStream | null>(null);
+  
   const [isConnected, setIsConnected] = useState(false);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [streamEnded, setStreamEnded] = useState(false);
   const [showChat, setShowChat] = useState(true);
   const [socketError, setSocketError] = useState<string | null>(null);
+
+  // Handle Private Call
+  const acceptPrivateCall = async () => {
+    if (!socket) return;
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setPrivateStream(stream);
+      
+      const pc = new RTCPeerConnection(config);
+      privatePeerConnection.current = pc;
+
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+      });
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          // Send candidate back to broadcaster (who initiated the call)
+          // We need to know broadcaster ID, but for now we assume the offer came from broadcaster
+          // The server handles routing based on socket ID
+          // Wait, we need the caller ID. Let's store it in state when offer arrives.
+        }
+      };
+
+      // We need to handle the offer that was stored or passed
+      // This logic needs to be inside the socket event listener or state
+      
+      setIncomingCall(false);
+      setIsPrivateCallActive(true);
+      
+    } catch (err) {
+      console.error("Error accessing media for private call:", err);
+      alert("No se pudo acceder a la cámara/micrófono");
+      setIncomingCall(false);
+    }
+  };
+
+  const rejectPrivateCall = () => {
+    setIncomingCall(false);
+    // Optionally emit rejection event
+  };
+
+  const endPrivateCall = () => {
+    if (privateStream) {
+      privateStream.getTracks().forEach(track => track.stop());
+      setPrivateStream(null);
+    }
+    if (privatePeerConnection.current) {
+      privatePeerConnection.current.close();
+      privatePeerConnection.current = null;
+    }
+    setIsPrivateCallActive(false);
+  };
 
   useEffect(() => {
     const s = io(window.location.origin, {
@@ -45,6 +105,30 @@ export default function View() {
     s.on("broadcaster", () => {
       setStreamEnded(false);
       s.emit("watcher");
+    });
+
+    // Private Call Logic
+    s.on("private_offer", async (callerId: string, description: RTCSessionDescriptionInit) => {
+      setIncomingCall(true);
+      
+      // We need to define the accept function here to close over callerId and description
+      // Or store them in refs/state to be used by the UI handler
+      // For simplicity, let's auto-accept or handle via state if we want a UI prompt
+      // But the UI handler 'acceptPrivateCall' needs access to these.
+      
+      // Let's modify the strategy:
+      // 1. Store pending offer in ref
+      // 2. Show UI
+      // 3. On Accept, process the ref
+      
+      // Storing in a way accessible to the component scope
+      (window as any).pendingPrivateOffer = { callerId, description };
+    });
+
+    s.on("private_candidate", (callerId: string, candidate: RTCIceCandidateInit) => {
+      if (privatePeerConnection.current) {
+        privatePeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
+      }
     });
 
     s.on("offer", async (id: string, description: RTCSessionDescriptionInit) => {
@@ -98,19 +182,62 @@ export default function View() {
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
+      // End private call if broadcaster disconnects
+      endPrivateCall();
     });
 
     s.on("disconnect", () => {
       setIsConnected(false);
       setIsBroadcasting(false);
       peerConnection.current?.close();
+      endPrivateCall();
     });
 
     return () => {
       s.disconnect();
       peerConnection.current?.close();
+      endPrivateCall();
     };
   }, []);
+
+  // Real implementation of acceptPrivateCall that uses the stored offer
+  const handleAcceptCall = async () => {
+    const pending = (window as any).pendingPrivateOffer;
+    if (!pending || !socket) return;
+    
+    const { callerId, description } = pending;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setPrivateStream(stream);
+      
+      const pc = new RTCPeerConnection(config);
+      privatePeerConnection.current = pc;
+
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+      });
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("private_candidate", callerId, event.candidate);
+        }
+      };
+
+      await pc.setRemoteDescription(description);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      
+      socket.emit("private_answer", callerId, pc.localDescription);
+      
+      setIncomingCall(false);
+      setIsPrivateCallActive(true);
+    } catch (err) {
+      console.error("Error accepting call:", err);
+      alert("Error al iniciar la llamada privada.");
+      setIncomingCall(false);
+    }
+  };
 
   return (
     <div className="relative w-full h-screen bg-black text-zinc-50 overflow-hidden">
@@ -123,6 +250,49 @@ export default function View() {
           className="w-full h-full object-contain"
         />
         
+        {/* Incoming Call Modal */}
+        {incomingCall && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50 backdrop-blur-sm">
+            <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-2xl max-w-sm w-full text-center">
+              <div className="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <Phone className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Invitación a Video</h3>
+              <p className="text-zinc-400 mb-6">
+                El anfitrión te está invitando a unirte a una videollamada privada.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button 
+                  onClick={rejectPrivateCall}
+                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors"
+                >
+                  Rechazar
+                </button>
+                <button 
+                  onClick={handleAcceptCall}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  <Phone className="w-4 h-4" /> Aceptar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Private Call Active Indicator */}
+        {isPrivateCallActive && (
+          <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-emerald-600/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
+            <Phone className="w-4 h-4 text-white" />
+            <span className="text-sm font-medium text-white">En llamada privada con el anfitrión</span>
+            <button 
+              onClick={endPrivateCall}
+              className="ml-2 p-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+
         {!isBroadcasting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 text-center z-10">
             {isConnected ? (

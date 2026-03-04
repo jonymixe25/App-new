@@ -10,6 +10,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/broadcast" element={<Broadcast />} />
         <Route path="/view" element={<View />} />
+        <Route path="/vista" element={<View />} />
       </Routes>
     </BrowserRouter>
   );

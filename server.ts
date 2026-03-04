@@ -23,6 +23,8 @@ async function startServer() {
   let broadcaster: string | null = null;
   let viewersCount = 0;
   const chatHistory: any[] = [];
+  // Almacenar usuarios conectados: socket.id -> { username, id }
+  const users: { [id: string]: { username: string; id: string } } = {};
 
   io.on("connection", (socket) => {
     socket.on("broadcaster", () => {
@@ -37,6 +39,15 @@ async function startServer() {
       viewersCount++;
       io.emit("viewers_count", viewersCount);
       socket.emit("chat_history", chatHistory);
+    });
+
+    // Registro de usuario para el chat y lista de espectadores
+    socket.on("register_user", (username: string) => {
+      users[socket.id] = { username, id: socket.id };
+      // Enviar lista actualizada al broadcaster
+      if (broadcaster) {
+        io.to(broadcaster).emit("user_list", Object.values(users));
+      }
     });
 
     socket.on("chat_message", (message) => {
@@ -55,6 +66,7 @@ async function startServer() {
       }
     });
 
+    // Señalización para Broadcast (Uno a Muchos)
     socket.on("offer", (id, message) => {
       socket.to(id).emit("offer", socket.id, message);
     });
@@ -67,7 +79,28 @@ async function startServer() {
       socket.to(id).emit("candidate", socket.id, message);
     });
 
+    // Señalización para Llamada Privada (Bidireccional)
+    socket.on("private_offer", (targetId, description) => {
+      socket.to(targetId).emit("private_offer", socket.id, description);
+    });
+
+    socket.on("private_answer", (targetId, description) => {
+      socket.to(targetId).emit("private_answer", socket.id, description);
+    });
+
+    socket.on("private_candidate", (targetId, candidate) => {
+      socket.to(targetId).emit("private_candidate", socket.id, candidate);
+    });
+
     socket.on("disconnect", () => {
+      // Eliminar usuario de la lista
+      if (users[socket.id]) {
+        delete users[socket.id];
+        if (broadcaster) {
+          io.to(broadcaster).emit("user_list", Object.values(users));
+        }
+      }
+
       if (broadcaster === socket.id) {
         broadcaster = null;
         socket.broadcast.emit("disconnectPeer", socket.id);

@@ -78,6 +78,9 @@ export default function Chat({ socket, isHost = false, transparent = false }: Ch
     e.preventDefault();
     if (username.trim()) {
       setIsUsernameSet(true);
+      if (socket && !isHost) {
+        socket.emit("register_user", username.trim());
+      }
     }
   };
 
