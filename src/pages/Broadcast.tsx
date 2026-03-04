@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X, Circle, Square, Save } from "lucide-react";
 import Chat from "../components/Chat";
+import { Link } from "react-router-dom";
+import { saveRecording } from "../utils/videoStorage";
 
 const config = {
   iceServers: [
@@ -28,6 +30,12 @@ export default function Broadcast() {
   const [privateCallUser, setPrivateCallUser] = useState<User | null>(null);
   const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
   
+  // Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewers, setViewers] = useState(0);
@@ -62,7 +70,7 @@ export default function Broadcast() {
   const handleShare = async () => {
     const currentOrigin = window.location.origin;
     const sharedOrigin = currentOrigin.replace('ais-dev', 'ais-pre');
-    const viewerUrl = `${sharedOrigin}/`;
+    const viewerUrl = `${sharedOrigin}/view`;
     
     try {
       await navigator.clipboard.writeText(viewerUrl);
@@ -141,6 +149,60 @@ export default function Broadcast() {
     const m = Math.floor((seconds % 3600) / 60);
     const s = seconds % 60;
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Recording Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } else {
+      setRecordingTime(0);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  const startRecording = () => {
+    if (!stream) return;
+    
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp9'
+    });
+    
+    mediaRecorderRef.current = mediaRecorder;
+    chunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+      await saveRecording(blob, recordingTime);
+      alert("Grabación guardada con éxito. Puedes verla en la página de Grabaciones.");
+    };
+
+    mediaRecorder.start();
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   useEffect(() => {
@@ -303,6 +365,7 @@ export default function Broadcast() {
   };
 
   const stopStream = () => {
+    if (isRecording) stopRecording();
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
@@ -423,9 +486,22 @@ export default function Broadcast() {
               <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
                 <Clock className="w-4 h-4 text-emerald-400" /> {formatUptime(uptime)}
               </div>
+              {isRecording && (
+                <div className="flex items-center gap-2 bg-red-500/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-500/50 text-xs font-medium text-red-200 animate-pulse">
+                  <Circle className="w-3 h-3 fill-red-500 text-red-500" /> REC {formatUptime(recordingTime)}
+                </div>
+              )}
             </div>
 
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/50 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-10">
+              <button
+                onClick={toggleRecording}
+                className={`p-4 rounded-full transition-colors ${isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-800 hover:bg-zinc-700 text-white'}`}
+                title={isRecording ? "Detener Grabación" : "Iniciar Grabación"}
+              >
+                {isRecording ? <Square className="w-6 h-6 fill-current" /> : <Circle className="w-6 h-6 fill-red-500 text-red-500" />}
+              </button>
+              <div className="w-px h-8 bg-white/10 mx-2"></div>
               <button
                 onClick={toggleVideo}
                 className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
@@ -457,6 +533,13 @@ export default function Broadcast() {
       </div>
 
       <div className="absolute top-4 right-4 z-50 flex gap-2">
+        <Link
+          to="/recordings"
+          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
+          title="Ver Grabaciones"
+        >
+          <Save className="w-6 h-6" />
+        </Link>
         <button
           onClick={() => setShowUserList(!showUserList)}
           className={`p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showUserList ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-black/50 hover:bg-black/70'}`}
