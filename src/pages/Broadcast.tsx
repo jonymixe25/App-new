@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { Video, VideoOff, Mic, MicOff, AlertCircle, Activity, Users, Clock } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2 } from "lucide-react";
 import Chat from "../components/Chat";
 
 const config = {
   iceServers: [
-    {
-      urls: ["stun:stun.l.google.com:19302"]
-    }
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" }
   ]
 };
 
@@ -16,14 +15,33 @@ export default function Broadcast() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
+  const pendingCandidates = useRef<{ [id: string]: RTCIceCandidateInit[] }>({});
   
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewers, setViewers] = useState(0);
   const [uptime, setUptime] = useState(0);
+  const [showChat, setShowChat] = useState(true);
+  const [copied, setCopied] = useState(false);
+  
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [socketError, setSocketError] = useState<string | null>(null);
 
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(true);
+
+  const handleShare = async () => {
+    // Usamos el dominio personalizado configurado por el usuario
+    const viewerUrl = "https://vidamixe.mx/view";
+    
+    try {
+      await navigator.clipboard.writeText(viewerUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy URL", err);
+    }
+  };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -45,8 +63,31 @@ export default function Broadcast() {
   };
 
   useEffect(() => {
-    const s = io(window.location.origin);
+    // Forzamos el uso de polling primero y luego websocket para evitar problemas con proxies
+    const s = io(window.location.origin, {
+      transports: ['polling', 'websocket'],
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
     setSocket(s);
+
+    s.on("connect", () => {
+      setIsSocketConnected(true);
+      setSocketError(null);
+      if (isStreaming) {
+        s.emit("broadcaster");
+      }
+    });
+
+    s.on("connect_error", (err) => {
+      setIsSocketConnected(false);
+      setSocketError(`Error de conexión: ${err.message}`);
+      console.error("Socket connection error:", err);
+    });
+
+    s.on("disconnect", () => {
+      setIsSocketConnected(false);
+    });
 
     s.on("viewers_count", (count: number) => {
       setViewers(count);
@@ -76,12 +117,32 @@ export default function Broadcast() {
         });
     });
 
-    s.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
-      peerConnections.current[id]?.setRemoteDescription(description);
+    s.on("answer", async (id: string, description: RTCSessionDescriptionInit) => {
+      const pc = peerConnections.current[id];
+      if (pc) {
+        try {
+          await pc.setRemoteDescription(description);
+          const candidates = pendingCandidates.current[id] || [];
+          for (const candidate of candidates) {
+            pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
+          }
+          pendingCandidates.current[id] = [];
+        } catch (err) {
+          console.error("Error setting remote description:", err);
+        }
+      }
     });
 
     s.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      peerConnections.current[id]?.addIceCandidate(new RTCIceCandidate(candidate));
+      const pc = peerConnections.current[id];
+      if (pc) {
+        if (pc.remoteDescription) {
+          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
+        } else {
+          if (!pendingCandidates.current[id]) pendingCandidates.current[id] = [];
+          pendingCandidates.current[id].push(candidate);
+        }
+      }
     });
 
     s.on("disconnectPeer", (id: string) => {
@@ -89,13 +150,16 @@ export default function Broadcast() {
         peerConnections.current[id].close();
         delete peerConnections.current[id];
       }
+      if (pendingCandidates.current[id]) {
+        delete pendingCandidates.current[id];
+      }
     });
 
     return () => {
       s.disconnect();
       Object.values<RTCPeerConnection>(peerConnections.current).forEach(pc => pc.close());
     };
-  }, [stream]);
+  }, [stream, isStreaming]);
 
   const startStream = async () => {
     try {
@@ -115,7 +179,7 @@ export default function Broadcast() {
       setIsStreaming(true);
       setError(null);
       
-      if (socket) {
+      if (socket && isSocketConnected) {
         socket.emit("broadcaster");
       }
     } catch (err) {
@@ -160,70 +224,30 @@ export default function Broadcast() {
   };
 
   return (
-    <div className="h-screen bg-zinc-950 text-zinc-50 flex flex-col overflow-hidden">
-      <header className="bg-zinc-900 border-b border-zinc-800 p-4 flex justify-between items-center shrink-0">
-        <h1 className="text-xl font-semibold">Panel de Control del Anfitrión</h1>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2 text-sm text-zinc-400">
-            <span className="relative flex h-3 w-3">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isStreaming ? 'bg-emerald-400' : 'bg-zinc-500'}`}></span>
-              <span className={`relative inline-flex rounded-full h-3 w-3 ${isStreaming ? 'bg-emerald-500' : 'bg-zinc-500'}`}></span>
-            </span>
-            {isStreaming ? 'Transmisión Activa' : 'Desconectado'}
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 p-6 flex flex-col overflow-y-auto">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-xl flex items-center gap-3 mb-6 shrink-0">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <p>{error}</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 shrink-0">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-sm text-zinc-400">Espectadores</p>
-                <p className="text-2xl font-semibold">{viewers}</p>
-              </div>
-            </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-sm text-zinc-400">Tiempo en Vivo</p>
-                <p className="text-2xl font-semibold">{formatUptime(uptime)}</p>
-              </div>
-            </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center">
-                <Activity className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-sm text-zinc-400">Estado de Conexión</p>
-                <p className="text-2xl font-semibold text-emerald-400">Excelente</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800 flex-shrink-0">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
-            
-            {!isStreaming && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/90 backdrop-blur-sm">
+    <div className="relative w-full h-screen bg-black text-zinc-50 overflow-hidden">
+      <div className="absolute inset-0 bg-black flex items-center justify-center">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="w-full h-full object-contain"
+        />
+        
+        {!isStreaming && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 text-center z-10">
+            {!isSocketConnected ? (
+              <>
+                <div className="w-20 h-20 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-6">
+                  <Loader2 className="w-10 h-10 animate-spin" />
+                </div>
+                <h2 className="text-2xl font-semibold mb-2">Conectando al servidor...</h2>
+                <p className="text-zinc-400 mb-8 max-w-md text-center">
+                  {socketError || "Estableciendo conexión en tiempo real. Por favor espera."}
+                </p>
+              </>
+            ) : (
+              <>
                 <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6">
                   <Video className="w-10 h-10" />
                 </div>
@@ -237,37 +261,84 @@ export default function Broadcast() {
                 >
                   Iniciar Transmisión
                 </button>
-              </div>
-            )}
-
-            {isStreaming && (
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent flex justify-center gap-4">
-                <button
-                  onClick={toggleVideo}
-                  className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                >
-                  {videoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-                </button>
-                <button
-                  onClick={toggleAudio}
-                  className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                >
-                  {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-                </button>
-                <button
-                  onClick={stopStream}
-                  className="px-6 py-4 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition-colors ml-4"
-                >
-                  Detener Transmisión
-                </button>
-              </div>
+              </>
             )}
           </div>
-        </main>
+        )}
 
-        <aside className="w-96 flex-shrink-0">
-          <Chat socket={socket} isHost={true} />
-        </aside>
+        {isStreaming && (
+          <>
+            <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                <span className="relative flex h-2 w-2">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSocketConnected ? 'bg-red-400' : 'bg-amber-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isSocketConnected ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                </span>
+                <span className="text-xs font-medium tracking-wider text-white uppercase">
+                  {isSocketConnected ? 'En Vivo' : 'Reconectando...'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
+                <Users className="w-4 h-4 text-indigo-400" /> {viewers}
+              </div>
+              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
+                <Clock className="w-4 h-4 text-emerald-400" /> {formatUptime(uptime)}
+              </div>
+            </div>
+
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/50 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-10">
+              <button
+                onClick={toggleVideo}
+                className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+              >
+                {videoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+              </button>
+              <button
+                onClick={toggleAudio}
+                className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+              >
+                {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+              </button>
+              <button
+                onClick={stopStream}
+                className="px-6 py-4 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition-colors ml-2"
+              >
+                Detener
+              </button>
+            </div>
+          </>
+        )}
+
+        {error && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 backdrop-blur-md text-white p-4 rounded-xl flex items-center gap-3 z-50 shadow-lg">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="absolute top-4 right-4 z-50 flex gap-2">
+        <button
+          onClick={handleShare}
+          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
+          title="Copiar enlace de espectador"
+        >
+          {copied ? <Check className="w-6 h-6 text-emerald-400" /> : <Share2 className="w-6 h-6" />}
+        </button>
+        <button
+          onClick={() => setShowChat(!showChat)}
+          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
+        >
+          <MessageSquare className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div 
+        className={`absolute top-0 right-0 h-full w-full md:w-80 lg:w-96 transition-transform duration-300 ease-in-out z-40 ${
+          showChat ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <Chat socket={socket} isHost={true} transparent={true} />
       </div>
     </div>
   );

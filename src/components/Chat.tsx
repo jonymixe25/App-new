@@ -12,9 +12,10 @@ export interface ChatMessage {
 interface ChatProps {
   socket: Socket | null;
   isHost?: boolean;
+  transparent?: boolean;
 }
 
-export default function Chat({ socket, isHost = false }: ChatProps) {
+export default function Chat({ socket, isHost = false, transparent = false }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [username, setUsername] = useState("");
@@ -82,7 +83,7 @@ export default function Chat({ socket, isHost = false }: ChatProps) {
 
   if (!isUsernameSet) {
     return (
-      <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800 p-6 items-center justify-center">
+      <div className={`flex flex-col h-full ${transparent ? 'bg-black/50 backdrop-blur-sm' : 'bg-zinc-900 border-l border-zinc-800'} p-6 items-center justify-center`}>
         <div className="w-16 h-16 bg-indigo-500/10 text-indigo-500 rounded-full flex items-center justify-center mb-6">
           <User className="w-8 h-8" />
         </div>
@@ -96,7 +97,7 @@ export default function Chat({ socket, isHost = false }: ChatProps) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Tu nombre..."
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors"
+            className={`w-full ${transparent ? 'bg-black/50 border-white/10' : 'bg-zinc-950 border-zinc-800'} border rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition-colors`}
             maxLength={20}
             required
           />
@@ -112,8 +113,8 @@ export default function Chat({ socket, isHost = false }: ChatProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800">
-      <div className="p-4 border-b border-zinc-800 bg-zinc-900/50">
+    <div className={`flex flex-col h-full ${transparent ? 'bg-black/50 backdrop-blur-sm' : 'bg-zinc-900 border-l border-zinc-800'}`}>
+      <div className={`p-4 border-b ${transparent ? 'border-white/10 bg-black/20' : 'border-zinc-800 bg-zinc-900/50'}`}>
         <h3 className="font-semibold flex items-center gap-2">
           Chat en Vivo
           <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2 py-0.5 rounded-full">
@@ -155,14 +156,14 @@ export default function Chat({ socket, isHost = false }: ChatProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-zinc-900 border-t border-zinc-800">
+      <div className={`p-4 border-t ${transparent ? 'bg-black/20 border-white/10' : 'bg-zinc-900 border-zinc-800'}`}>
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+            className={`flex-1 ${transparent ? 'bg-black/50 border-white/10' : 'bg-zinc-950 border-zinc-800'} border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors`}
             maxLength={200}
           />
           <button
