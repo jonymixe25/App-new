@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Trash2, Download, Play, Clock, FileVideo, Calendar, Upload } from "lucide-react";
+import { Trash2, Download, Play, Clock, FileVideo, Calendar, Upload } from "lucide-react";
 import { getRecordings, deleteRecording, saveRecording, SavedRecording } from "../utils/videoStorage";
 
 export default function Recordings() {
@@ -95,12 +95,6 @@ export default function Recordings() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link 
-              to="/admin" 
-              className="p-2 bg-stone-800 hover:bg-stone-700 rounded-full transition-colors border border-stone-700"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </Link>
             <h1 className="text-3xl font-bold text-white">Grabaciones Guardadas</h1>
           </div>
           

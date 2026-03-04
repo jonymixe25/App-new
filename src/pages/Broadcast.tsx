@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X, Circle, Square, Save } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X, Circle, Square, Save, RefreshCw } from "lucide-react";
 import Chat from "../components/Chat";
 import { Link } from "react-router-dom";
 import { saveRecording } from "../utils/videoStorage";
+import { getSocketUrl } from "../utils/socket";
 
 const config = {
   iceServers: [
@@ -48,6 +49,7 @@ export default function Broadcast() {
   
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [socketError, setSocketError] = useState<string | null>(null);
+  const [streamName, setStreamName] = useState("");
 
   // Sound ref
   const notificationSound = useRef<HTMLAudioElement | null>(null);
@@ -206,12 +208,13 @@ export default function Broadcast() {
   };
 
   useEffect(() => {
-    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const socketUrl = getSocketUrl();
     
     const s = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      timeout: 20000,
     });
     setSocket(s);
 
@@ -358,7 +361,7 @@ export default function Broadcast() {
       setError(null);
       
       if (socket && isSocketConnected) {
-        socket.emit("broadcaster");
+        socket.emit("broadcaster", streamName || "Transmisión en vivo");
       }
     } catch (err) {
       console.error("Error accessing media devices.", err);
@@ -406,7 +409,7 @@ export default function Broadcast() {
   // ... (Authentication render logic remains the same)
   
   return (
-    <div className="relative w-full h-screen bg-black text-zinc-50 overflow-hidden">
+    <div className="relative w-full h-[calc(100vh-64px)] bg-black text-zinc-50 overflow-hidden">
       <div className="absolute inset-0 bg-black flex items-center justify-center">
         <video
           ref={videoRef}
@@ -446,9 +449,17 @@ export default function Broadcast() {
                   <Loader2 className="w-10 h-10 animate-spin" />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Conectando al servidor...</h2>
-                <p className="text-zinc-400 mb-8 max-w-md text-center">
-                  {socketError || "Estableciendo conexión en tiempo real. Por favor espera."}
-                </p>
+                <div className="text-zinc-400 mb-8 max-w-md text-center space-y-4">
+                  <p>{socketError || "Estableciendo conexión en tiempo real. Por favor espera."}</p>
+                  {socketError && (
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Reintentar Conexión
+                    </button>
+                  )}
+                </div>
               </>
             ) : (
               <>
@@ -456,9 +467,23 @@ export default function Broadcast() {
                   <Video className="w-10 h-10" />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Listo para transmitir</h2>
-                <p className="text-zinc-400 mb-8 max-w-md text-center">
-                  Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
-                </p>
+                <div className="w-full max-w-md space-y-4 mb-8">
+                  <div className="text-left">
+                    <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">
+                      Nombre de la Transmisión
+                    </label>
+                    <input 
+                      type="text"
+                      value={streamName}
+                      onChange={(e) => setStreamName(e.target.value)}
+                      placeholder="Ej: Concierto en la Sierra, Noticias Ayuuk..."
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                    />
+                  </div>
+                  <p className="text-zinc-400 text-sm text-center">
+                    Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
+                  </p>
+                </div>
                 <button
                   onClick={startStream}
                   className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-900/20"

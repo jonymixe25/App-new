@@ -2,19 +2,24 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Broadcast from "./pages/Broadcast";
 import View from "./pages/View";
-
 import Recordings from "./pages/Recordings";
+import Navbar from "./components/Navbar";
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/admin" element={<Broadcast />} />
-        <Route path="/view" element={<View />} />
-        <Route path="/vista" element={<View />} />
-        <Route path="/recordings" element={<Recordings />} />
-      </Routes>
+      <div className="min-h-screen bg-stone-900 flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/admin" element={<Broadcast />} />
+            <Route path="/view" element={<View />} />
+            <Route path="/vista" element={<View />} />
+            <Route path="/recordings" element={<Recordings />} />
+          </Routes>
+        </main>
+      </div>
     </BrowserRouter>
   );
 }

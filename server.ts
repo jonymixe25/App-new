@@ -20,34 +20,39 @@ async function startServer() {
     }
   });
 
-  let broadcaster: string | null = null;
-  let viewersCount = 0;
+  // Almacenar broadcasters: socket.id -> { id, name, viewers }
+  const broadcasters = new Map<string, { id: string, name: string, viewers: number }>();
   const chatHistory: any[] = [];
   // Almacenar usuarios conectados: socket.id -> { username, id }
   const users: { [id: string]: { username: string; id: string } } = {};
 
   io.on("connection", (socket) => {
-    socket.on("broadcaster", () => {
-      broadcaster = socket.id;
-      socket.broadcast.emit("broadcaster");
+    socket.on("broadcaster", (streamName: string) => {
+      broadcasters.set(socket.id, { 
+        id: socket.id, 
+        name: streamName || `Transmisión de ${socket.id.slice(0, 4)}`,
+        viewers: 0 
+      });
+      io.emit("broadcaster_list", Array.from(broadcasters.values()));
     });
 
-    socket.on("watcher", () => {
-      if (broadcaster) {
-        socket.to(broadcaster).emit("watcher", socket.id);
+    socket.on("get_broadcasters", () => {
+      socket.emit("broadcaster_list", Array.from(broadcasters.values()));
+    });
+
+    socket.on("watcher", (broadcasterId: string) => {
+      const b = broadcasters.get(broadcasterId);
+      if (b) {
+        socket.to(broadcasterId).emit("watcher", socket.id);
+        b.viewers++;
+        io.emit("broadcaster_list", Array.from(broadcasters.values()));
       }
-      viewersCount++;
-      io.emit("viewers_count", viewersCount);
       socket.emit("chat_history", chatHistory);
     });
 
     // Registro de usuario para el chat y lista de espectadores
     socket.on("register_user", (username: string) => {
       users[socket.id] = { username, id: socket.id };
-      // Enviar lista actualizada al broadcaster
-      if (broadcaster) {
-        io.to(broadcaster).emit("user_list", Object.values(users));
-      }
     });
 
     socket.on("chat_message", (message) => {
@@ -57,7 +62,9 @@ async function startServer() {
     });
 
     socket.on("delete_message", (messageId) => {
-      if (socket.id === broadcaster) {
+      // Solo el broadcaster de la sala actual o un admin podría borrar
+      // Por simplicidad, permitimos si el socket.id está en broadcasters
+      if (broadcasters.has(socket.id)) {
         const index = chatHistory.findIndex(m => m.id === messageId);
         if (index !== -1) {
           chatHistory.splice(index, 1);
@@ -96,20 +103,18 @@ async function startServer() {
       // Eliminar usuario de la lista
       if (users[socket.id]) {
         delete users[socket.id];
-        if (broadcaster) {
-          io.to(broadcaster).emit("user_list", Object.values(users));
-        }
       }
 
-      if (broadcaster === socket.id) {
-        broadcaster = null;
+      if (broadcasters.has(socket.id)) {
+        broadcasters.delete(socket.id);
         socket.broadcast.emit("disconnectPeer", socket.id);
+        io.emit("broadcaster_list", Array.from(broadcasters.values()));
       } else {
-        if (broadcaster) {
-          socket.to(broadcaster).emit("disconnectPeer", socket.id);
-        }
-        viewersCount = Math.max(0, viewersCount - 1);
-        io.emit("viewers_count", viewersCount);
+        // Reducir viewers de todos los broadcasters donde este socket estaba mirando
+        // (Simplificado: el cliente debería avisar al salir de una sala, pero aquí lo hacemos general)
+        broadcasters.forEach(b => {
+          socket.to(b.id).emit("disconnectPeer", socket.id);
+        });
       }
     });
   });

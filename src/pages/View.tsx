@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, Check } from "lucide-react";
+import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, Check, RefreshCw, Facebook, Share2, Users } from "lucide-react";
 import Chat from "../components/Chat";
+import { getSocketUrl } from "../utils/socket";
+
+interface Broadcaster {
+  id: string;
+  name: string;
+  viewers: number;
+}
 
 const config = {
   iceServers: [
@@ -28,6 +35,8 @@ export default function View() {
   const [showChat, setShowChat] = useState(true);
   const [socketError, setSocketError] = useState<string | null>(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [broadcasters, setBroadcasters] = useState<Broadcaster[]>([]);
+  const [selectedBroadcasterId, setSelectedBroadcasterId] = useState<string | null>(null);
 
   // Sound ref
   const notificationSound = useRef<HTMLAudioElement | null>(null);
@@ -98,20 +107,52 @@ export default function View() {
     setIsPrivateCallActive(false);
   };
 
+  const shareToFacebook = () => {
+    const url = window.location.href;
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
+  };
+
+  const selectBroadcaster = (id: string) => {
+    if (selectedBroadcasterId === id) return;
+    
+    // Limpiar conexión previa si existe
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
+    
+    setSelectedBroadcasterId(id);
+    setIsBroadcasting(false);
+    setStreamEnded(false);
+    
+    if (socket) {
+      socket.emit("watcher", id);
+    }
+  };
+
   useEffect(() => {
-    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const socketUrl = getSocketUrl();
 
     const s = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      timeout: 20000,
     });
     setSocket(s);
 
     s.on("connect", () => {
       setIsConnected(true);
       setSocketError(null);
-      s.emit("watcher");
+      s.emit("get_broadcasters");
+    });
+
+    s.on("broadcaster_list", (list: Broadcaster[]) => {
+      setBroadcasters(list);
+      // Si no hay nada seleccionado y hay broadcasters, seleccionar el primero
+      if (list.length > 0 && !selectedBroadcasterId) {
+        // No seleccionamos automáticamente para dejar que el usuario elija
+      }
     });
 
     s.on("connect_error", (err) => {
@@ -121,8 +162,7 @@ export default function View() {
     });
 
     s.on("broadcaster", () => {
-      setStreamEnded(false);
-      s.emit("watcher");
+      s.emit("get_broadcasters");
     });
 
     s.on("chat_message", (message: any) => {
@@ -200,15 +240,18 @@ export default function View() {
       }
     });
 
-    s.on("disconnectPeer", () => {
-      peerConnection.current?.close();
-      setIsBroadcasting(false);
-      setStreamEnded(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
+    s.on("disconnectPeer", (id: string) => {
+      if (id === selectedBroadcasterId) {
+        peerConnection.current?.close();
+        setIsBroadcasting(false);
+        setStreamEnded(true);
+        setSelectedBroadcasterId(null);
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+        }
+        endPrivateCall();
       }
-      // End private call if broadcaster disconnects
-      endPrivateCall();
+      s.emit("get_broadcasters");
     });
 
     s.on("disconnect", () => {
@@ -265,7 +308,7 @@ export default function View() {
   };
 
   return (
-    <div className="relative w-full h-screen bg-black text-zinc-50 overflow-hidden">
+    <div className="relative w-full h-[calc(100vh-64px)] bg-black text-zinc-50 overflow-hidden">
       <div className="absolute inset-0 bg-black flex items-center justify-center">
         <video
           ref={videoRef}
@@ -318,6 +361,56 @@ export default function View() {
           </div>
         )}
 
+        {/* Stream Selector Overlay */}
+        {!isBroadcasting && isConnected && broadcasters.length > 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 z-40">
+            <div className="w-full max-w-2xl space-y-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-bold text-white">Transmisiones Disponibles</h2>
+                <p className="text-zinc-400">Selecciona una transmisión para comenzar a ver</p>
+              </div>
+              
+              <div className="grid sm:grid-cols-2 gap-4">
+                {broadcasters.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => selectBroadcaster(b.id)}
+                    className="flex flex-col items-start p-6 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-zinc-800 hover:border-emerald-500/50 transition-all text-left group"
+                  >
+                    <div className="flex items-center justify-between w-full mb-4">
+                      <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <MonitorPlay className="w-5 h-5" />
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        EN VIVO
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">{b.name}</h3>
+                    <div className="flex items-center gap-2 text-zinc-500 text-sm">
+                      <Users className="w-4 h-4" />
+                      <span>{b.viewers} espectadores</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Facebook Share Button */}
+        {isBroadcasting && (
+          <div className="absolute top-4 right-4 z-20 flex gap-2">
+            <button 
+              onClick={shareToFacebook}
+              className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white text-sm font-bold rounded-full shadow-lg transition-all hover:scale-105"
+            >
+              <Facebook className="w-4 h-4" />
+              Compartir en Facebook
+            </button>
+          </div>
+        )}
+
         {!isBroadcasting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 text-center z-10">
             {isConnected ? (
@@ -358,9 +451,17 @@ export default function View() {
                   <Loader2 className="w-10 h-10 animate-spin" />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Conectando...</h2>
-                <p className="text-zinc-400 mb-8 max-w-md">
-                  {socketError || "Estableciendo conexión con el servidor de transmisión."}
-                </p>
+                <div className="text-zinc-400 mb-8 max-w-md text-center space-y-4">
+                  <p>{socketError || "Estableciendo conexión con el servidor de transmisión."}</p>
+                  {socketError && (
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm"
+                    >
+                      <RefreshCw className="w-4 h-4" /> Reintentar Conexión
+                    </button>
+                  )}
+                </div>
               </>
             )}
           </div>
