@@ -30,15 +30,10 @@ export default function AdminNews() {
   const fetchNews = async () => {
     try {
       const res = await fetch("/api/news");
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Error ${res.status}: ${text.slice(0, 50)}`);
-      }
       const data = await res.json();
       setNews(data);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error fetching news:", err);
-      setError(err.message);
     }
   };
 

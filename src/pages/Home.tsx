@@ -17,18 +17,9 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/api/news")
-      .then(async res => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`Server error ${res.status}: ${text.slice(0, 50)}`);
-        }
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => setNews(data))
-      .catch(err => {
-        console.error("Error fetching news:", err);
-        // Fallback or error state
-      });
+      .catch(err => console.error("Error fetching news:", err));
   }, []);
 
   return (
