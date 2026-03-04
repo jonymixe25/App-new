@@ -138,10 +138,12 @@ async function startServer() {
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
+    console.log("GET /api/health");
     res.json({ status: "ok" });
   });
 
   app.get("/api/news", (req, res) => {
+    console.log("GET /api/news");
     res.json(news);
   });
 
@@ -195,6 +197,12 @@ async function startServer() {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
     res.json({ success: true, user: { id: user.id, username: user.username, name: user.name } });
+  });
+
+  // Catch-all for API routes to prevent falling through to Vite
+  app.all("/api/*", (req, res) => {
+    console.log(`404 API: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Ruta de API no encontrada: ${req.url}` });
   });
 
   // Vite middleware for development

@@ -27,11 +27,20 @@ export default function Auth() {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || "Algo salió mal");
+        const text = await res.text();
+        let errorMessage = "Algo salió mal";
+        try {
+          const data = JSON.parse(text);
+          errorMessage = data.error || errorMessage;
+        } catch (e) {
+          errorMessage = `Error del servidor (${res.status})`;
+          console.error("Non-JSON response:", text);
+        }
+        throw new Error(errorMessage);
       }
+
+      const data = await res.json();
 
       // Store user in localStorage
       localStorage.setItem("broadcaster_user", JSON.stringify(data.user));
