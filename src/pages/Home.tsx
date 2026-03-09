@@ -1,8 +1,11 @@
 import { Link } from "react-router-dom";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin } from "lucide-react";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useEffect, useState } from "react";
+import { io } from "socket.io-client";
+import { getSocketUrl } from "../utils/socket";
 import LivePreview from "../components/LivePreview";
+import { getRecordings, SavedRecording } from "../utils/videoStorage";
 
 interface NewsItem {
   id: string;
@@ -14,12 +17,46 @@ interface NewsItem {
 
 export default function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [isLive, setIsLive] = useState(false);
+  const [randomVideo, setRandomVideo] = useState<SavedRecording | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/news")
       .then(res => res.json())
       .then(data => setNews(data))
       .catch(err => console.error("Error fetching news:", err));
+
+    // Check if anyone is live
+    const socketUrl = getSocketUrl();
+    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+    socket.on("connect", () => socket.emit("get_broadcasters"));
+    socket.on("broadcaster_list", (list: any[]) => {
+      setIsLive(list.length > 0);
+    });
+
+    // Load random recording
+    const loadRandomRecording = async () => {
+      try {
+        const recordings = await getRecordings();
+        if (recordings.length > 0) {
+          const random = recordings[Math.floor(Math.random() * recordings.length)];
+          setRandomVideo(random);
+          setVideoUrl(URL.createObjectURL(random.blob));
+          // Show popup after 3 seconds
+          setTimeout(() => setShowPopup(true), 3000);
+        }
+      } catch (err) {
+        console.error("Error loading recordings for popup:", err);
+      }
+    };
+    loadRandomRecording();
+
+    return () => { 
+      socket.disconnect(); 
+      if (videoUrl) URL.revokeObjectURL(videoUrl);
+    };
   }, []);
 
   return (
@@ -42,9 +79,17 @@ export default function Home() {
         
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-primary/20 border border-brand-primary/30 text-brand-primary backdrop-blur-sm">
-              <CloudFog className="w-4 h-4" />
-              <span className="text-sm font-medium tracking-wide uppercase">La región de los jamás conquistados</span>
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-primary/20 border border-brand-primary/30 text-brand-primary backdrop-blur-sm">
+                <CloudFog className="w-4 h-4" />
+                <span className="text-sm font-medium tracking-wide uppercase">La región de los jamás conquistados</span>
+              </div>
+              {isLive && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 border border-red-500/30 text-red-500 backdrop-blur-sm animate-pulse">
+                  <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                  <span className="text-sm font-bold tracking-wide uppercase">En Vivo Ahora</span>
+                </div>
+              )}
             </div>
             
             <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-white leading-none">
@@ -203,6 +248,55 @@ export default function Home() {
           </p>
         </div>
       </div>
+
+      {/* Random Video Popup */}
+      {showPopup && randomVideo && videoUrl && (
+        <div className="fixed bottom-6 right-6 z-[100] w-80 md:w-96 animate-in slide-in-from-bottom-10 duration-500">
+          <div className="bg-brand-surface border border-white/10 rounded-2xl shadow-2xl overflow-hidden group">
+            <div className="relative aspect-video bg-black">
+              <video 
+                src={videoUrl} 
+                autoPlay 
+                muted 
+                loop 
+                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
+              
+              <button 
+                onClick={() => setShowPopup(false)}
+                className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/80 text-white rounded-full transition-colors z-10"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-brand-primary">
+                    <Sparkles className="w-3 h-3 fill-brand-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Recuerdo Mixe</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white line-clamp-1">{randomVideo.name}</h4>
+                </div>
+                <Link 
+                  to="/recordings"
+                  className="p-2 bg-brand-primary text-white rounded-lg hover:scale-110 transition-transform shadow-lg shadow-brand-primary/20"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                </Link>
+              </div>
+            </div>
+            <div className="p-3 bg-brand-surface/50 backdrop-blur-md flex items-center justify-between border-t border-white/5">
+              <span className="text-[10px] text-neutral-500 font-medium">
+                Grabado el {new Date(randomVideo.date).toLocaleDateString()}
+              </span>
+              <Link to="/recordings" className="text-[10px] text-brand-primary font-bold hover:underline">
+                Ver todas
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

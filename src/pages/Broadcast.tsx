@@ -224,7 +224,7 @@ export default function Broadcast() {
       setIsSocketConnected(true);
       setSocketError(null);
       if (isStreaming) {
-        s.emit("broadcaster");
+        s.emit("broadcaster", streamName || "Transmisión en vivo");
       }
     });
 

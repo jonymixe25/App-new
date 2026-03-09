@@ -43,6 +43,11 @@ async function startServer() {
   // Almacenar usuarios conectados: socket.id -> { username, id }
   const users: { [id: string]: { username: string; id: string } } = {};
 
+  const emitUserList = () => {
+    const userList = Object.values(users);
+    io.emit("user_list", userList);
+  };
+
   io.on("connection", (socket) => {
     socket.on("broadcaster", (streamName: string) => {
       broadcasters.set(socket.id, { 
@@ -63,6 +68,8 @@ async function startServer() {
         socket.to(broadcasterId).emit("watcher", socket.id);
         b.viewers++;
         io.emit("broadcaster_list", Array.from(broadcasters.values()));
+        // Emitir conteo específico al broadcaster
+        io.to(broadcasterId).emit("viewers_count", b.viewers);
       }
       socket.emit("chat_history", chatHistory);
     });
@@ -70,6 +77,7 @@ async function startServer() {
     // Registro de usuario para el chat y lista de espectadores
     socket.on("register_user", (username: string) => {
       users[socket.id] = { username, id: socket.id };
+      emitUserList();
     });
 
     socket.on("chat_message", (message) => {
@@ -120,6 +128,7 @@ async function startServer() {
       // Eliminar usuario de la lista
       if (users[socket.id]) {
         delete users[socket.id];
+        emitUserList();
       }
 
       if (broadcasters.has(socket.id)) {
@@ -128,9 +137,10 @@ async function startServer() {
         io.emit("broadcaster_list", Array.from(broadcasters.values()));
       } else {
         // Reducir viewers de todos los broadcasters donde este socket estaba mirando
-        // (Simplificado: el cliente debería avisar al salir de una sala, pero aquí lo hacemos general)
         broadcasters.forEach(b => {
           socket.to(b.id).emit("disconnectPeer", socket.id);
+          // Opcional: decrementar viewers si sabemos que estaba mirando
+          // Por simplicidad, el cliente debería avisar al salir de una sala
         });
       }
     });

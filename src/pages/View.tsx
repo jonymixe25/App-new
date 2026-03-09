@@ -27,6 +27,7 @@ export default function View() {
   
   // Private Call State
   const [incomingCall, setIncomingCall] = useState(false);
+  const [pendingOffer, setPendingOffer] = useState<{ callerId: string, description: RTCSessionDescriptionInit } | null>(null);
   const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
   const privatePeerConnection = useRef<RTCPeerConnection | null>(null);
   const [privateStream, setPrivateStream] = useState<MediaStream | null>(null);
@@ -57,47 +58,9 @@ export default function View() {
   };
 
   // Handle Private Call
-  const acceptPrivateCall = async () => {
-    if (!socket) return;
-    
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode }, 
-        audio: true 
-      });
-      setPrivateStream(stream);
-      
-      const pc = new RTCPeerConnection(config);
-      privatePeerConnection.current = pc;
-
-      stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
-      });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          // Send candidate back to broadcaster (who initiated the call)
-          // We need to know broadcaster ID, but for now we assume the offer came from broadcaster
-          // The server handles routing based on socket ID
-          // Wait, we need the caller ID. Let's store it in state when offer arrives.
-        }
-      };
-
-      // We need to handle the offer that was stored or passed
-      // This logic needs to be inside the socket event listener or state
-      
-      setIncomingCall(false);
-      setIsPrivateCallActive(true);
-      
-    } catch (err) {
-      console.error("Error accessing media for private call:", err);
-      alert("No se pudo acceder a la cámara/micrófono");
-      setIncomingCall(false);
-    }
-  };
-
   const rejectPrivateCall = () => {
     setIncomingCall(false);
+    setPendingOffer(null);
     // Optionally emit rejection event
   };
 
@@ -195,10 +158,6 @@ export default function View() {
 
     s.on("broadcaster_list", (list: Broadcaster[]) => {
       setBroadcasters(list);
-      // Si no hay nada seleccionado y hay broadcasters, seleccionar el primero
-      if (list.length > 0 && !selectedBroadcasterId) {
-        // No seleccionamos automáticamente para dejar que el usuario elija
-      }
     });
 
     s.on("connect_error", (err) => {
@@ -220,20 +179,8 @@ export default function View() {
 
     // Private Call Logic
     s.on("private_offer", async (callerId: string, description: RTCSessionDescriptionInit) => {
+      setPendingOffer({ callerId, description });
       setIncomingCall(true);
-      
-      // We need to define the accept function here to close over callerId and description
-      // Or store them in refs/state to be used by the UI handler
-      // For simplicity, let's auto-accept or handle via state if we want a UI prompt
-      // But the UI handler 'acceptPrivateCall' needs access to these.
-      
-      // Let's modify the strategy:
-      // 1. Store pending offer in ref
-      // 2. Show UI
-      // 3. On Accept, process the ref
-      
-      // Storing in a way accessible to the component scope
-      (window as any).pendingPrivateOffer = { callerId, description };
     });
 
     s.on("private_candidate", (callerId: string, candidate: RTCIceCandidateInit) => {
@@ -312,14 +259,13 @@ export default function View() {
       peerConnection.current?.close();
       endPrivateCall();
     };
-  }, []);
+  }, [selectedBroadcasterId]);
 
   // Real implementation of acceptPrivateCall that uses the stored offer
   const handleAcceptCall = async () => {
-    const pending = (window as any).pendingPrivateOffer;
-    if (!pending || !socket) return;
+    if (!pendingOffer || !socket) return;
     
-    const { callerId, description } = pending;
+    const { callerId, description } = pendingOffer;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
