@@ -9,7 +9,7 @@ import Navbar from "./components/Navbar";
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-stone-900 flex flex-col">
+      <div className="min-h-screen bg-brand-bg flex flex-col">
         <Navbar />
         <main className="flex-1">
           <Routes>

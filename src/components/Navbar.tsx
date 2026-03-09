@@ -11,16 +11,16 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-stone-900/80 backdrop-blur-md border-b border-stone-800">
+    <nav className="sticky top-0 z-50 w-full bg-brand-bg/80 backdrop-blur-md border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center group-hover:bg-emerald-500 transition-colors">
+            <div className="w-8 h-8 bg-brand-primary rounded-lg flex items-center justify-center group-hover:bg-brand-primary/80 transition-colors">
               <Mountain className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight text-white">
-              Vida <span className="text-emerald-400">Mixe</span> TV
+              Vida <span className="text-brand-primary">Mixe</span> TV
             </span>
           </Link>
 
@@ -35,8 +35,8 @@ export default function Navbar() {
                   to={link.path}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                     isActive
-                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/20"
-                      : "text-stone-400 hover:text-white hover:bg-stone-800"
+                      ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20"
+                      : "text-neutral-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -57,8 +57,8 @@ export default function Navbar() {
                   to={link.path}
                   className={`p-2 rounded-full transition-all ${
                     isActive
-                      ? "bg-emerald-600 text-white"
-                      : "text-stone-400 hover:text-white hover:bg-stone-800"
+                      ? "bg-brand-primary text-white"
+                      : "text-neutral-400 hover:text-white hover:bg-white/5"
                   }`}
                   title={link.label}
                 >

@@ -469,7 +469,7 @@ export default function Broadcast() {
   // ... (Authentication render logic remains the same)
   
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] bg-black text-zinc-50 overflow-hidden">
+    <div className="relative w-full h-[calc(100vh-64px)] bg-brand-bg text-neutral-50 overflow-hidden">
       <Helmet>
         <title>Transmitir en Vivo | Vida Mixe TV</title>
         <meta name="description" content="Panel de control para transmisiones en vivo. Comparte tu cultura y tradiciones con el mundo." />
@@ -485,7 +485,7 @@ export default function Broadcast() {
         
         {/* Private Call Overlay */}
         {isPrivateCallActive && (
-          <div className="absolute bottom-24 right-4 w-64 h-48 bg-zinc-900 rounded-xl border border-zinc-700 shadow-2xl overflow-hidden z-30">
+          <div className="absolute bottom-24 right-4 w-64 h-48 bg-brand-surface rounded-xl border border-white/5 shadow-2xl overflow-hidden z-30">
              <video
                 ref={privateVideoRef}
                 autoPlay
@@ -493,12 +493,12 @@ export default function Broadcast() {
                 className="w-full h-full object-cover"
              />
              <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white flex items-center gap-1">
-               <Phone className="w-3 h-3 text-emerald-400" />
+               <Phone className="w-3 h-3 text-brand-primary" />
                {privateCallUser?.username}
              </div>
              <button 
                onClick={endPrivateCall}
-               className="absolute top-2 right-2 p-1 bg-red-500/80 hover:bg-red-600 text-white rounded-full transition-colors"
+               className="absolute top-2 right-2 p-1 bg-brand-primary/80 hover:bg-brand-primary text-white rounded-full transition-colors"
              >
                <X className="w-4 h-4" />
              </button>
@@ -506,19 +506,19 @@ export default function Broadcast() {
         )}
 
         {!isStreaming && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 text-center z-10">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 text-center z-10">
             {!isSocketConnected ? (
               <>
-                <div className="w-20 h-20 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-6">
+                <div className="w-20 h-20 bg-brand-secondary/10 text-brand-secondary rounded-full flex items-center justify-center mb-6">
                   <Loader2 className="w-10 h-10 animate-spin" />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Conectando al servidor...</h2>
-                <div className="text-zinc-400 mb-8 max-w-md text-center space-y-4">
+                <div className="text-neutral-400 mb-8 max-w-md text-center space-y-4">
                   <p>{socketError || "Estableciendo conexión en tiempo real. Por favor espera."}</p>
                   {socketError && (
                     <button 
                       onClick={() => window.location.reload()}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm"
                     >
                       <RefreshCw className="w-4 h-4" /> Reintentar Conexión
                     </button>
@@ -527,13 +527,13 @@ export default function Broadcast() {
               </>
             ) : (
               <>
-                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+                <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6">
                   <Video className="w-10 h-10" />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Listo para transmitir</h2>
                 <div className="w-full max-w-md space-y-4 mb-8">
                   <div className="text-left">
-                    <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1.5 ml-1">
+                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1.5 ml-1">
                       Nombre de la Transmisión
                     </label>
                     <input 
@@ -541,23 +541,23 @@ export default function Broadcast() {
                       value={streamName}
                       onChange={(e) => setStreamName(e.target.value)}
                       placeholder="Ej: Concierto en la Sierra, Noticias Ayuuk..."
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                      className="w-full bg-brand-surface border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
                     />
                   </div>
-                  <p className="text-zinc-400 text-sm text-center">
+                  <p className="text-neutral-400 text-sm text-center">
                     Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
                   </p>
                 </div>
                 <div className="flex gap-4">
                   <button
                     onClick={startStream}
-                    className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
+                    className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl transition-colors shadow-lg shadow-brand-primary/20"
                   >
                     Iniciar Transmisión
                   </button>
                   <button
                     onClick={flipCamera}
-                    className="p-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors border border-zinc-700"
+                    className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/5"
                     title="Voltear Cámara"
                   >
                     <Camera className="w-6 h-6" />
@@ -573,22 +573,22 @@ export default function Broadcast() {
             <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
               <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
                 <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSocketConnected ? 'bg-red-400' : 'bg-amber-400'}`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isSocketConnected ? 'bg-red-500' : 'bg-amber-500'}`}></span>
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSocketConnected ? 'bg-brand-primary/40' : 'bg-brand-secondary/40'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isSocketConnected ? 'bg-brand-primary' : 'bg-brand-secondary'}`}></span>
                 </span>
                 <span className="text-xs font-medium tracking-wider text-white uppercase">
                   {isSocketConnected ? 'En Vivo' : 'Reconectando...'}
                 </span>
               </div>
               <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
-                <Users className="w-4 h-4 text-indigo-400" /> {viewers}
+                <Users className="w-4 h-4 text-brand-accent" /> {viewers}
               </div>
               <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
-                <Clock className="w-4 h-4 text-emerald-400" /> {formatUptime(uptime)}
+                <Clock className="w-4 h-4 text-brand-secondary" /> {formatUptime(uptime)}
               </div>
               {isRecording && (
-                <div className="flex items-center gap-2 bg-red-500/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-500/50 text-xs font-medium text-red-200 animate-pulse">
-                  <Circle className="w-3 h-3 fill-red-500 text-red-500" /> REC {formatUptime(recordingTime)}
+                <div className="flex items-center gap-2 bg-brand-primary/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-brand-primary/50 text-xs font-medium text-brand-primary animate-pulse">
+                  <Circle className="w-3 h-3 fill-brand-primary text-brand-primary" /> REC {formatUptime(recordingTime)}
                 </div>
               )}
             </div>
@@ -596,35 +596,35 @@ export default function Broadcast() {
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/50 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-10">
               <button
                 onClick={toggleRecording}
-                className={`p-4 rounded-full transition-colors ${isRecording ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-zinc-800 hover:bg-zinc-700 text-white'}`}
+                className={`p-4 rounded-full transition-colors ${isRecording ? 'bg-brand-primary hover:bg-brand-primary/80 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
                 title={isRecording ? "Detener Grabación" : "Iniciar Grabación"}
               >
-                {isRecording ? <Square className="w-6 h-6 fill-current" /> : <Circle className="w-6 h-6 fill-red-500 text-red-500" />}
+                {isRecording ? <Square className="w-6 h-6 fill-current" /> : <Circle className="w-6 h-6 fill-brand-primary text-brand-primary" />}
               </button>
               <div className="w-px h-8 bg-white/10 mx-2"></div>
               <button
                 onClick={toggleVideo}
-                className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-brand-primary hover:bg-brand-primary/80 text-white'}`}
               >
                 {videoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
               </button>
               <button
                 onClick={toggleAudio}
-                className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-brand-primary hover:bg-brand-primary/80 text-white'}`}
                 title={audioEnabled ? "Silenciar Micrófono" : "Activar Micrófono"}
               >
                 {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
               </button>
               <button
                 onClick={flipCamera}
-                className="p-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full transition-colors"
+                className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"
                 title="Voltear Cámara"
               >
                 <Camera className="w-6 h-6" />
               </button>
               <button
                 onClick={stopStream}
-                className="px-6 py-4 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition-colors ml-2"
+                className="px-6 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-full transition-colors ml-2"
               >
                 Detener
               </button>
@@ -650,7 +650,7 @@ export default function Broadcast() {
         </Link>
         <button
           onClick={() => setShowUserList(!showUserList)}
-          className={`p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showUserList ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-black/50 hover:bg-black/70'}`}
+          className={`p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showUserList ? 'bg-brand-primary hover:bg-brand-primary/80' : 'bg-black/50 hover:bg-black/70'}`}
           title="Ver espectadores"
         >
           <Users className="w-6 h-6" />
@@ -660,18 +660,18 @@ export default function Broadcast() {
           className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
           title="Copiar enlace de espectador"
         >
-          {copied ? <Check className="w-6 h-6 text-emerald-400" /> : <Share2 className="w-6 h-6" />}
+          {copied ? <Check className="w-6 h-6 text-brand-primary" /> : <Share2 className="w-6 h-6" />}
         </button>
         <button
           onClick={() => {
             setShowChat(!showChat);
             if (!showChat) setUnreadMessages(0);
           }}
-          className={`relative p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showChat ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-black/50 hover:bg-black/70'}`}
+          className={`relative p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showChat ? 'bg-brand-accent hover:bg-brand-accent/80' : 'bg-black/50 hover:bg-black/70'}`}
         >
           <MessageSquare className="w-6 h-6" />
           {!showChat && unreadMessages > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
+            <span className="absolute -top-1 -right-1 bg-brand-primary text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
               {unreadMessages > 9 ? '9+' : unreadMessages}
             </span>
           )}
@@ -680,7 +680,7 @@ export default function Broadcast() {
 
       {/* User List Panel */}
       <div 
-        className={`absolute top-20 right-4 w-64 bg-zinc-900/90 backdrop-blur-md border border-zinc-800 rounded-xl overflow-hidden transition-all duration-300 z-40 ${
+        className={`absolute top-20 right-4 w-64 bg-brand-surface/90 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300 z-40 ${
           showUserList ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'
         }`}
       >
@@ -689,7 +689,7 @@ export default function Broadcast() {
         </div>
         <div className="max-h-64 overflow-y-auto p-2 space-y-1">
           {connectedUsers.length === 0 ? (
-            <p className="text-xs text-zinc-500 text-center py-4">No hay usuarios registrados</p>
+            <p className="text-xs text-neutral-500 text-center py-4">No hay usuarios registrados</p>
           ) : (
             connectedUsers.map(user => (
               <div key={user.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors group">
@@ -697,7 +697,7 @@ export default function Broadcast() {
                 {!isPrivateCallActive && (
                   <button 
                     onClick={() => startPrivateCall(user)}
-                    className="p-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                    className="p-1.5 bg-brand-primary/20 text-brand-primary hover:bg-brand-primary hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                     title="Llamada privada"
                   >
                     <Phone className="w-3 h-3" />

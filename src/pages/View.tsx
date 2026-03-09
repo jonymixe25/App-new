@@ -354,7 +354,7 @@ export default function View() {
   };
 
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] bg-black text-zinc-50 overflow-hidden">
+    <div className="relative w-full h-[calc(100vh-64px)] bg-brand-bg text-neutral-50 overflow-hidden">
       <Helmet>
         <title>Ver Transmisión en Vivo | Vida Mixe TV</title>
         <meta name="description" content="Mira las transmisiones en vivo de la comunidad Mixe. Únete al chat y participa en la conversación." />
@@ -370,25 +370,25 @@ export default function View() {
         
         {/* Incoming Call Modal */}
         {incomingCall && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50 backdrop-blur-sm">
-            <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-2xl max-w-sm w-full text-center">
-              <div className="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <div className="absolute inset-0 flex items-center justify-center bg-brand-bg/80 z-50 backdrop-blur-sm">
+            <div className="bg-brand-surface p-6 rounded-2xl border border-white/5 shadow-2xl max-w-sm w-full text-center">
+              <div className="w-16 h-16 bg-brand-primary/20 text-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                 <Phone className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-bold mb-2">Invitación a Video</h3>
-              <p className="text-zinc-400 mb-6">
+              <p className="text-neutral-400 mb-6">
                 El anfitrión te está invitando a unirte a una videollamada privada.
               </p>
               <div className="flex gap-3 justify-center">
                 <button 
                   onClick={rejectPrivateCall}
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl transition-colors"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors"
                 >
                   Rechazar
                 </button>
                 <button 
                   onClick={handleAcceptCall}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
                 >
                   <Phone className="w-4 h-4" /> Aceptar
                 </button>
@@ -399,7 +399,7 @@ export default function View() {
 
         {/* Private Call Active Indicator */}
         {isPrivateCallActive && (
-          <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-emerald-600/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
+          <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-brand-primary/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
             <Phone className="w-4 h-4 text-white" />
             <span className="text-sm font-medium text-white">En llamada privada con el anfitrión</span>
             <button 
@@ -420,7 +420,7 @@ export default function View() {
 
         {/* Private Call Local Video Overlay */}
         {isPrivateCallActive && (
-          <div className="absolute bottom-24 right-4 w-48 h-36 bg-zinc-900 rounded-xl border border-zinc-700 shadow-2xl overflow-hidden z-30">
+          <div className="absolute bottom-24 right-4 w-48 h-36 bg-brand-surface rounded-xl border border-white/10 shadow-2xl overflow-hidden z-30">
              <video
                 ref={privateVideoRef}
                 autoPlay
@@ -429,7 +429,7 @@ export default function View() {
                 className="w-full h-full object-cover"
              />
              <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
-               <Users className="w-3 h-3 text-emerald-400" />
+               <Users className="w-3 h-3 text-brand-primary" />
                Tú
              </div>
           </div>
@@ -437,11 +437,11 @@ export default function View() {
 
         {/* Stream Selector Overlay */}
         {!isBroadcasting && isConnected && broadcasters.length > 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 z-40">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 z-40">
             <div className="w-full max-w-2xl space-y-6">
               <div className="text-center space-y-2">
                 <h2 className="text-3xl font-bold text-white">Transmisiones Disponibles</h2>
-                <p className="text-zinc-400">Selecciona una transmisión para comenzar a ver</p>
+                <p className="text-neutral-400">Selecciona una transmisión para comenzar a ver</p>
               </div>
               
               <div className="grid sm:grid-cols-2 gap-4">
@@ -449,19 +449,19 @@ export default function View() {
                   <button
                     key={b.id}
                     onClick={() => selectBroadcaster(b.id)}
-                    className="flex flex-col items-start p-6 bg-zinc-900 border border-zinc-800 rounded-2xl hover:bg-zinc-800 hover:border-emerald-500/50 transition-all text-left group"
+                    className="flex flex-col items-start p-6 bg-brand-surface border border-white/5 rounded-2xl hover:bg-brand-surface/80 hover:border-brand-primary/50 transition-all text-left group"
                   >
                     <div className="flex items-center justify-between w-full mb-4">
-                      <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <div className="w-10 h-10 bg-brand-primary/10 text-brand-primary rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                         <MonitorPlay className="w-5 h-5" />
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">
-                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-brand-primary bg-brand-primary/10 px-2 py-1 rounded">
+                        <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-pulse"></span>
                         EN VIVO
                       </div>
                     </div>
                     <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">{b.name}</h3>
-                    <div className="flex items-center gap-2 text-zinc-500 text-sm">
+                    <div className="flex items-center gap-2 text-neutral-500 text-sm">
                       <Users className="w-4 h-4" />
                       <span>{b.viewers} espectadores</span>
                     </div>
@@ -486,33 +486,33 @@ export default function View() {
         )}
 
         {!isBroadcasting && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950/90 backdrop-blur-sm p-6 text-center z-10">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 text-center z-10">
             {isConnected ? (
               <>
                 {streamEnded ? (
                   <>
-                    <div className="w-20 h-20 bg-zinc-800 text-zinc-400 rounded-full flex items-center justify-center mb-6">
+                    <div className="w-20 h-20 bg-white/5 text-neutral-400 rounded-full flex items-center justify-center mb-6">
                       <VideoOff className="w-10 h-10" />
                     </div>
                     <h2 className="text-2xl font-semibold mb-2">Transmisión finalizada</h2>
-                    <p className="text-zinc-400 mb-8 max-w-md">
+                    <p className="text-neutral-400 mb-8 max-w-md">
                       El transmisor ha finalizado el video en vivo o se ha perdido la conexión.
                     </p>
-                    <div className="flex items-center gap-3 text-zinc-500">
+                    <div className="flex items-center gap-3 text-neutral-500">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span>Esperando que se reanude...</span>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="w-20 h-20 bg-indigo-500/10 text-indigo-500 rounded-full flex items-center justify-center mb-6">
+                    <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6">
                       <MonitorPlay className="w-10 h-10" />
                     </div>
                     <h2 className="text-2xl font-semibold mb-2">Esperando transmisión</h2>
-                    <p className="text-zinc-400 mb-8 max-w-md">
+                    <p className="text-neutral-400 mb-8 max-w-md">
                       El transmisor aún no ha iniciado el video en vivo. La reproducción comenzará automáticamente.
                     </p>
-                    <div className="flex items-center gap-3 text-indigo-400">
+                    <div className="flex items-center gap-3 text-brand-primary">
                       <Loader2 className="w-5 h-5 animate-spin" />
                       <span>Conectado al servidor</span>
                     </div>
@@ -521,16 +521,16 @@ export default function View() {
               </>
             ) : (
               <>
-                <div className="w-20 h-20 bg-amber-500/10 text-amber-500 rounded-full flex items-center justify-center mb-6">
+                <div className="w-20 h-20 bg-brand-secondary/10 text-brand-secondary rounded-full flex items-center justify-center mb-6">
                   <Loader2 className="w-10 h-10 animate-spin" />
                 </div>
                 <h2 className="text-2xl font-semibold mb-2">Conectando...</h2>
-                <div className="text-zinc-400 mb-8 max-w-md text-center space-y-4">
+                <div className="text-neutral-400 mb-8 max-w-md text-center space-y-4">
                   <p>{socketError || "Estableciendo conexión con el servidor de transmisión."}</p>
                   {socketError && (
                     <button 
                       onClick={() => window.location.reload()}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm"
                     >
                       <RefreshCw className="w-4 h-4" /> Reintentar Conexión
                     </button>

@@ -32,6 +32,11 @@ async function startServer() {
     }
   ];
 
+  // User storage for broadcasters
+  let broadcasters_accounts: any[] = [
+    { id: "1", username: "admin", password: "password123", name: "Administrador" }
+  ];
+
   // Almacenar broadcasters: socket.id -> { id, name, viewers }
   const broadcasters = new Map<string, { id: string, name: string, viewers: number }>();
   const chatHistory: any[] = [];
@@ -133,10 +138,12 @@ async function startServer() {
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
+    console.log("GET /api/health");
     res.json({ status: "ok" });
   });
 
   app.get("/api/news", (req, res) => {
+    console.log("GET /api/news");
     res.json(news);
   });
 
@@ -165,6 +172,37 @@ async function startServer() {
     }
     news = news.filter(n => n.id !== id);
     res.json({ success: true });
+  });
+
+  // Auth endpoints
+  app.post("/api/auth/register", (req, res) => {
+    const { username, password, name } = req.body;
+    if (broadcasters_accounts.find(u => u.username === username)) {
+      return res.status(400).json({ error: "El usuario ya existe" });
+    }
+    const newUser = {
+      id: Date.now().toString(),
+      username,
+      password, // In a real app, hash this!
+      name: name || username
+    };
+    broadcasters_accounts.push(newUser);
+    res.json({ success: true, user: { id: newUser.id, username: newUser.username, name: newUser.name } });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const { username, password } = req.body;
+    const user = broadcasters_accounts.find(u => u.username === username && u.password === password);
+    if (!user) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+    res.json({ success: true, user: { id: user.id, username: user.username, name: user.name } });
+  });
+
+  // Catch-all for API routes to prevent falling through to Vite
+  app.all("/api/*", (req, res) => {
+    console.log(`404 API: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Ruta de API no encontrada: ${req.url}` });
   });
 
   // Vite middleware for development
