@@ -24,34 +24,14 @@ interface CommunityVideo {
   author: string;
   thumbnail: string;
   price: string;
+  video_url: string;
 }
 
 export default function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
-
-  const communityVideos: CommunityVideo[] = [
-    {
-      id: "v1",
-      title: "Guelaguetza en la Sierra Mixe 2025",
-      author: "Cultura Ayuuk",
-      thumbnail: "https://picsum.photos/seed/guelaguetza/800/450",
-      price: "$150 MXN"
-    },
-    {
-      id: "v2",
-      title: "Entrevista con Maestros del CECAM",
-      author: "Vida Mixe TV",
-      thumbnail: "https://picsum.photos/seed/cecam-interview/800/450",
-      price: "$99 MXN"
-    },
-    {
-      id: "v3",
-      title: "Paisajes de Tlahuitoltepec desde el Dron",
-      author: "Ayuuk Media",
-      thumbnail: "https://picsum.photos/seed/drone-mixe/800/450",
-      price: "$120 MXN"
-    }
-  ];
+  const [communityVideos, setCommunityVideos] = useState<CommunityVideo[]>([]);
+  const [purchasedIds, setPurchasedIds] = useState<string[]>([]);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
 
   const ayuukVideos: YouTubeVideo[] = [
     {
@@ -76,7 +56,49 @@ export default function Home() {
       .then(res => res.json())
       .then(data => setNews(data))
       .catch(err => console.error("Error fetching news:", err));
+
+    fetch("/api/community-videos")
+      .then(res => res.json())
+      .then(data => setCommunityVideos(data))
+      .catch(err => console.error("Error fetching videos:", err));
+
+    fetch("/api/my-purchases")
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setPurchasedIds(data.map((v: any) => v.id));
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  const handlePurchase = async (video: CommunityVideo) => {
+    if (purchasedIds.includes(video.id)) {
+      alert(`Ya has comprado: ${video.title}. ¡Disfruta del video!`);
+      return;
+    }
+
+    setBuyingId(video.id);
+    try {
+      const res = await fetch("/api/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: video.id })
+      });
+
+      if (res.ok) {
+        setPurchasedIds(prev => [...prev, video.id]);
+        alert(`¡Compra exitosa! Ahora puedes ver: ${video.title}`);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Error al procesar la compra. ¿Has iniciado sesión?");
+      }
+    } catch (err) {
+      alert("Error de conexión al procesar la compra.");
+    } finally {
+      setBuyingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col font-sans">
@@ -263,11 +285,27 @@ export default function Home() {
                     {video.title}
                   </h3>
                   <button 
-                    onClick={() => alert(`Iniciando proceso de compra para: ${video.title}\nPrecio: ${video.price}`)}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-brand-secondary hover:bg-brand-secondary/80 text-white font-bold rounded-xl transition-all shadow-lg shadow-brand-secondary/20"
+                    onClick={() => handlePurchase(video)}
+                    disabled={buyingId === video.id}
+                    className={`w-full inline-flex items-center justify-center gap-2 px-4 py-3 font-bold rounded-xl transition-all shadow-lg ${
+                      purchasedIds.includes(video.id)
+                        ? "bg-emerald-600 text-white shadow-emerald-600/20"
+                        : "bg-brand-secondary hover:bg-brand-secondary/80 text-white shadow-brand-secondary/20"
+                    } disabled:opacity-50`}
                   >
-                    <ShoppingCart className="w-4 h-4" />
-                    Comprar video
+                    {buyingId === video.id ? (
+                      "Procesando..."
+                    ) : purchasedIds.includes(video.id) ? (
+                      <>
+                        <Play className="w-4 h-4" />
+                        Ver ahora
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-4 h-4" />
+                        Comprar video
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

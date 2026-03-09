@@ -31,8 +31,60 @@ db.exec(`
     name TEXT,
     google_id TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
+  );
+
+  CREATE TABLE IF NOT EXISTS community_videos (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    author TEXT,
+    thumbnail TEXT,
+    price TEXT,
+    video_url TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS purchases (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    video_id TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(video_id) REFERENCES community_videos(id)
+  );
 `);
+
+// Seed community videos if empty
+const videoCount: any = db.prepare("SELECT COUNT(*) as count FROM community_videos").get();
+if (videoCount.count === 0) {
+  const seedVideos = [
+    {
+      id: "v1",
+      title: "Guelaguetza en la Sierra Mixe 2025",
+      author: "Cultura Ayuuk",
+      thumbnail: "https://picsum.photos/seed/guelaguetza/800/450",
+      price: "$150 MXN",
+      video_url: "https://www.w3schools.com/html/mov_bbb.mp4"
+    },
+    {
+      id: "v2",
+      title: "Entrevista con Maestros del CECAM",
+      author: "Vida Mixe TV",
+      thumbnail: "https://picsum.photos/seed/cecam-interview/800/450",
+      price: "$99 MXN",
+      video_url: "https://www.w3schools.com/html/mov_bbb.mp4"
+    },
+    {
+      id: "v3",
+      title: "Paisajes de Tlahuitoltepec desde el Dron",
+      author: "Ayuuk Media",
+      thumbnail: "https://picsum.photos/seed/drone-mixe/800/450",
+      price: "$120 MXN",
+      video_url: "https://www.w3schools.com/html/mov_bbb.mp4"
+    }
+  ];
+  const insert = db.prepare("INSERT INTO community_videos (id, title, author, thumbnail, price, video_url) VALUES (?, ?, ?, ?, ?, ?)");
+  seedVideos.forEach(v => insert.run(v.id, v.title, v.author, v.thumbnail, v.price, v.video_url));
+}
 
 async function startServer() {
   const app = express();
@@ -175,6 +227,69 @@ async function startServer() {
 
   app.get("/api/news", (req, res) => {
     res.json(news);
+  });
+
+  app.get("/api/community-videos", (req, res) => {
+    const videos = db.prepare("SELECT * FROM community_videos ORDER BY created_at DESC").all();
+    res.json(videos);
+  });
+
+  app.post("/api/community-videos", (req, res) => {
+    const { title, author, thumbnail, price, video_url, password } = req.body;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    if (!title || !author || !thumbnail || !price || !video_url) {
+      return res.status(400).json({ error: "Faltan campos requeridos" });
+    }
+
+    const id = "v" + Date.now().toString();
+    db.prepare("INSERT INTO community_videos (id, title, author, thumbnail, price, video_url) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(id, title, author, thumbnail, price, video_url);
+    
+    res.json({ id, title, author, thumbnail, price, video_url });
+  });
+
+  app.delete("/api/community-videos/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    db.prepare("DELETE FROM community_videos WHERE id = ?").run(id);
+    res.json({ success: true });
+  });
+
+  app.get("/api/my-purchases", (req, res) => {
+    const userCookie = req.cookies.user;
+    if (!userCookie) return res.status(401).json({ error: "No autenticado" });
+    const user = JSON.parse(userCookie);
+    
+    const purchases = db.prepare(`
+      SELECT v.* FROM community_videos v
+      JOIN purchases p ON v.id = p.video_id
+      WHERE p.user_id = ?
+    `).all(user.id);
+    
+    res.json(purchases);
+  });
+
+  app.post("/api/purchase", (req, res) => {
+    const userCookie = req.cookies.user;
+    if (!userCookie) return res.status(401).json({ error: "Inicia sesión para comprar" });
+    const user = JSON.parse(userCookie);
+    const { videoId } = req.body;
+
+    if (!videoId) return res.status(400).json({ error: "ID de video requerido" });
+
+    try {
+      const id = Math.random().toString(36).substring(2, 15);
+      db.prepare("INSERT INTO purchases (id, user_id, video_id) VALUES (?, ?, ?)")
+        .run(id, user.id, videoId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: "Error al procesar la compra" });
+    }
   });
 
   // --- AUTH ROUTES ---
