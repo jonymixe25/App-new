@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin } from "lucide-react";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, Youtube, ShoppingCart, Play } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useEffect, useState } from "react";
 import LivePreview from "../components/LivePreview";
@@ -12,8 +12,64 @@ interface NewsItem {
   author: string;
 }
 
+interface YouTubeVideo {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface CommunityVideo {
+  id: string;
+  title: string;
+  author: string;
+  thumbnail: string;
+  price: string;
+}
+
 export default function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
+
+  const communityVideos: CommunityVideo[] = [
+    {
+      id: "v1",
+      title: "Guelaguetza en la Sierra Mixe 2025",
+      author: "Cultura Ayuuk",
+      thumbnail: "https://picsum.photos/seed/guelaguetza/800/450",
+      price: "$150 MXN"
+    },
+    {
+      id: "v2",
+      title: "Entrevista con Maestros del CECAM",
+      author: "Vida Mixe TV",
+      thumbnail: "https://picsum.photos/seed/cecam-interview/800/450",
+      price: "$99 MXN"
+    },
+    {
+      id: "v3",
+      title: "Paisajes de Tlahuitoltepec desde el Dron",
+      author: "Ayuuk Media",
+      thumbnail: "https://picsum.photos/seed/drone-mixe/800/450",
+      price: "$120 MXN"
+    }
+  ];
+
+  const ayuukVideos: YouTubeVideo[] = [
+    {
+      id: "9_pY0T_D_yE",
+      title: "Banda Filarmónica del CECAM - Sones y Jarabes Mixes",
+      description: "Presentación magistral de la Banda Filarmónica del Centro de Capacitación Musical y Desarrollo de la Cultura Mixe."
+    },
+    {
+      id: "6l_S7hE8-fM",
+      title: "Santa María Tlahuitoltepec, Oaxaca",
+      description: "Un recorrido visual por la cuna de la música y la tradición Ayuuk en la Sierra Norte."
+    },
+    {
+      id: "Xm_m3v3X9cQ",
+      title: "Documental: El Pueblo Ayuuk",
+      description: "Conoce la historia, lengua y tradiciones de los jamás conquistados."
+    }
+  ];
 
   useEffect(() => {
     fetch("/api/news")
@@ -156,6 +212,124 @@ export default function Home() {
                 No hay noticias publicadas en este momento.
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Community Videos Section (Uploaded) */}
+      <div className="bg-brand-bg py-24 px-6 border-t border-white/5">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-end justify-between mb-12">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-brand-secondary font-semibold uppercase tracking-widest text-sm">
+                <Video className="w-4 h-4" />
+                <span>Exclusivos Vida Mixe</span>
+              </div>
+              <h2 className="text-4xl font-bold text-white">Videos de la Comunidad</h2>
+              <p className="text-neutral-400 max-w-2xl">
+                Contenido original producido por nuestra comunidad. Apoya a los creadores locales.
+              </p>
+            </div>
+            <Link to="/recordings" className="text-neutral-500 hover:text-white text-sm transition-colors">
+              Ver mis grabaciones
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {communityVideos.map((video) => (
+              <div key={video.id} className="bg-brand-surface border border-white/5 rounded-2xl overflow-hidden hover:border-brand-secondary/30 transition-all group">
+                <div className="aspect-video relative overflow-hidden">
+                  <img 
+                    src={video.thumbnail} 
+                    alt={video.title} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="w-12 h-12 bg-brand-secondary text-white rounded-full flex items-center justify-center shadow-xl">
+                      <Play className="w-6 h-6 fill-white" />
+                    </div>
+                  </div>
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-brand-secondary text-white text-xs font-bold rounded-full shadow-lg">
+                    {video.price}
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="text-xs text-neutral-500 mb-2 flex items-center gap-2">
+                    <Users className="w-3 h-3" />
+                    <span>{video.author}</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-4 line-clamp-1 group-hover:text-brand-secondary transition-colors">
+                    {video.title}
+                  </h3>
+                  <button 
+                    onClick={() => alert(`Iniciando proceso de compra para: ${video.title}\nPrecio: ${video.price}`)}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-brand-secondary hover:bg-brand-secondary/80 text-white font-bold rounded-xl transition-all shadow-lg shadow-brand-secondary/20"
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    Comprar video
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* YouTube Videos Section */}
+      <div className="bg-stone-950 py-24 px-6 border-t border-white/5">
+        <div className="max-w-7xl mx-auto">
+          <div className="space-y-2 mb-12">
+            <div className="flex items-center gap-2 text-brand-primary font-semibold uppercase tracking-widest text-sm">
+              <Youtube className="w-4 h-4" />
+              <span>Cultura en Video</span>
+            </div>
+            <h2 className="text-4xl font-bold text-white">Explora la Región Ayuuk</h2>
+            <p className="text-neutral-400 max-w-2xl">
+              Una selección de videos que muestran la riqueza musical, paisajística y cultural de nuestra tierra.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {ayuukVideos.map((video) => (
+              <div key={video.id} className="bg-brand-surface border border-white/5 rounded-2xl overflow-hidden hover:border-brand-primary/30 transition-all group">
+                <div className="aspect-video relative">
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${video.id}`}
+                    title={video.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-brand-primary transition-colors">
+                    {video.title}
+                  </h3>
+                  <p className="text-neutral-400 text-sm leading-relaxed mb-4">
+                    {video.description}
+                  </p>
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+                    <a 
+                      href={`https://www.youtube.com/watch?v=${video.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-neutral-500 hover:text-brand-primary font-medium flex items-center gap-1 transition-colors"
+                    >
+                      <Youtube className="w-3 h-3" />
+                      Ver en YouTube
+                    </a>
+                    <button 
+                      onClick={() => alert(`Iniciando proceso de compra para: ${video.title}`)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary/10 hover:bg-brand-primary text-brand-primary hover:text-white text-xs font-bold rounded-lg transition-all"
+                    >
+                      <ShoppingCart className="w-3 h-3" />
+                      Comprar video
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

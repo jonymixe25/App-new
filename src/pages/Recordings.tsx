@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Trash2, Download, Play, Clock, FileVideo, Calendar, Upload } from "lucide-react";
+import { Trash2, Download, Play, Clock, FileVideo, Calendar, Upload, ShoppingCart } from "lucide-react";
 import { getRecordings, deleteRecording, saveRecording, SavedRecording } from "../utils/videoStorage";
 
 export default function Recordings() {
@@ -161,6 +161,16 @@ export default function Recordings() {
 
                     <div className="flex gap-2 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
                       <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          alert(`Iniciando proceso de compra para: ${rec.name}`);
+                        }}
+                        className="p-2 hover:bg-brand-primary/10 rounded-lg text-brand-primary transition-colors"
+                        title="Comprar video"
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={(e) => handleDownload(rec, e)}
                         className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors"
                         title="Descargar"
@@ -205,9 +215,15 @@ export default function Recordings() {
                         <div className="flex gap-3">
                           <button
                             onClick={(e) => handleDownload(video, e)}
-                            className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            className="px-4 py-2 bg-brand-surface hover:bg-white/10 text-white rounded-lg font-medium flex items-center gap-2 transition-colors border border-white/5"
                           >
-                            <Download className="w-4 h-4" /> Descargar Video
+                            <Download className="w-4 h-4" /> Descargar
+                          </button>
+                          <button
+                            onClick={() => alert(`Iniciando proceso de compra para: ${video.name}`)}
+                            className="px-6 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-primary/20"
+                          >
+                            <ShoppingCart className="w-4 h-4" /> Comprar video
                           </button>
                         </div>
                       </div>
