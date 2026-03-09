@@ -213,10 +213,10 @@ export default function Broadcast() {
     const socketUrl = getSocketUrl();
     
     const s = io(socketUrl, {
+      transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,
-      transports: ['websocket']
     });
     setSocket(s);
 
