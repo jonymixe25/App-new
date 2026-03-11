@@ -32,11 +32,21 @@ async function startServer() {
     }
   ];
 
+  // User storage for broadcasters
+  let broadcasters_accounts: any[] = [
+    { id: "1", username: "admin", password: "password123", name: "Administrador" }
+  ];
+
   // Almacenar broadcasters: socket.id -> { id, name, viewers }
   const broadcasters = new Map<string, { id: string, name: string, viewers: number }>();
   const chatHistory: any[] = [];
   // Almacenar usuarios conectados: socket.id -> { username, id }
   const users: { [id: string]: { username: string; id: string } } = {};
+
+  const emitUserList = () => {
+    const userList = Object.values(users);
+    io.emit("user_list", userList);
+  };
 
   io.on("connection", (socket) => {
     socket.on("broadcaster", (streamName: string) => {
@@ -58,6 +68,8 @@ async function startServer() {
         socket.to(broadcasterId).emit("watcher", socket.id);
         b.viewers++;
         io.emit("broadcaster_list", Array.from(broadcasters.values()));
+        // Emitir conteo específico al broadcaster
+        io.to(broadcasterId).emit("viewers_count", b.viewers);
       }
       socket.emit("chat_history", chatHistory);
     });
@@ -65,6 +77,7 @@ async function startServer() {
     // Registro de usuario para el chat y lista de espectadores
     socket.on("register_user", (username: string) => {
       users[socket.id] = { username, id: socket.id };
+      emitUserList();
     });
 
     socket.on("chat_message", (message) => {
@@ -115,6 +128,7 @@ async function startServer() {
       // Eliminar usuario de la lista
       if (users[socket.id]) {
         delete users[socket.id];
+        emitUserList();
       }
 
       if (broadcasters.has(socket.id)) {
@@ -123,9 +137,10 @@ async function startServer() {
         io.emit("broadcaster_list", Array.from(broadcasters.values()));
       } else {
         // Reducir viewers de todos los broadcasters donde este socket estaba mirando
-        // (Simplificado: el cliente debería avisar al salir de una sala, pero aquí lo hacemos general)
         broadcasters.forEach(b => {
           socket.to(b.id).emit("disconnectPeer", socket.id);
+          // Opcional: decrementar viewers si sabemos que estaba mirando
+          // Por simplicidad, el cliente debería avisar al salir de una sala
         });
       }
     });
@@ -133,10 +148,12 @@ async function startServer() {
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
+    console.log("GET /api/health");
     res.json({ status: "ok" });
   });
 
   app.get("/api/news", (req, res) => {
+    console.log("GET /api/news");
     res.json(news);
   });
 
@@ -165,6 +182,37 @@ async function startServer() {
     }
     news = news.filter(n => n.id !== id);
     res.json({ success: true });
+  });
+
+  // Auth endpoints
+  app.post("/api/auth/register", (req, res) => {
+    const { username, password, name } = req.body;
+    if (broadcasters_accounts.find(u => u.username === username)) {
+      return res.status(400).json({ error: "El usuario ya existe" });
+    }
+    const newUser = {
+      id: Date.now().toString(),
+      username,
+      password, // In a real app, hash this!
+      name: name || username
+    };
+    broadcasters_accounts.push(newUser);
+    res.json({ success: true, user: { id: newUser.id, username: newUser.username, name: newUser.name } });
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const { username, password } = req.body;
+    const user = broadcasters_accounts.find(u => u.username === username && u.password === password);
+    if (!user) {
+      return res.status(401).json({ error: "Credenciales inválidas" });
+    }
+    res.json({ success: true, user: { id: user.id, username: user.username, name: user.name } });
+  });
+
+  // Catch-all for API routes to prevent falling through to Vite
+  app.all("/api/*", (req, res) => {
+    console.log(`404 API: ${req.method} ${req.url}`);
+    res.status(404).json({ error: `Ruta de API no encontrada: ${req.url}` });
   });
 
   // Vite middleware for development
