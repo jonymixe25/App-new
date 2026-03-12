@@ -11,9 +11,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Database
+console.log("Initializing Database...");
 const db = new Database("vidamixe.db");
 
 // Create tables if they don't exist
+console.log("Creating tables...");
 db.exec(`
   CREATE TABLE IF NOT EXISTS news (
     id TEXT PRIMARY KEY,
@@ -55,7 +57,10 @@ db.exec(`
   );
 `);
 
+console.log("Tables created successfully.");
+
 // Seed initial data if empty
+console.log("Checking news count...");
 const newsCount = db.prepare("SELECT COUNT(*) as count FROM news").get() as { count: number };
 if (newsCount.count === 0) {
   db.prepare(`
@@ -79,8 +84,10 @@ if (adminCount.count === 0) {
   `).run("1", "admin", "password123", "Administrador");
 }
 
+console.log("Checking team count...");
 const teamCount = db.prepare("SELECT COUNT(*) as count FROM team").get() as { count: number };
 if (teamCount.count === 0) {
+  console.log("Seeding initial team data...");
   const initialTeam = [
     {
       id: "1",
@@ -156,7 +163,7 @@ if (teamCount.count === 0) {
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
-  const PORT = parseInt(process.env.PORT || "3000", 10);
+  const PORT = 3000;
   const httpServer = createServer(app);
   
   const io = new Server(httpServer, {
@@ -423,4 +430,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});
