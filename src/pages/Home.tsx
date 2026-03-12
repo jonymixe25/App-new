@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles, ArrowRight, ChevronRight } from "lucide-react";
 import { Helmet } from "react-helmet-async";
-import { useEffect, useState } from "react";
+import { useEffect, useState, FormEvent, ChangeEvent } from "react";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "motion/react";
 import { getSocketUrl } from "../utils/socket";
 import LivePreview from "../components/LivePreview";
 import { getRecordings, SavedRecording } from "../utils/videoStorage";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles, ArrowRight, ChevronRight, Upload, Image as ImageIcon, ShieldAlert, Loader2 } from "lucide-react";
+import { moderateContent } from "../services/moderationService";
 
 interface NewsItem {
   id: string;
@@ -14,6 +15,8 @@ interface NewsItem {
   content: string;
   date: string;
   author: string;
+  imageUrl?: string;
+  videoUrl?: string;
 }
 
 export default function Home() {
@@ -22,16 +25,35 @@ export default function Home() {
   const [randomVideo, setRandomVideo] = useState<SavedRecording | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [isModerating, setIsModerating] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // News form state
+  const [showNewsForm, setShowNewsForm] = useState(false);
+  const [newNews, setNewNews] = useState({ title: "", content: "", imageUrl: "", videoUrl: "", password: "" });
+
+  const fetchNews = () => {
+    // Basic session cache check
+    const cachedNews = sessionStorage.getItem("vida_mixe_news");
+    if (cachedNews && news.length === 0) {
+      setNews(JSON.parse(cachedNews));
+    }
+
     fetch("/api/news")
       .then(res => res.json())
-      .then(data => setNews(data))
+      .then(data => {
+        setNews(data);
+        sessionStorage.setItem("vida_mixe_news", JSON.stringify(data));
+      })
       .catch(err => console.error("Error fetching news:", err));
+  };
+
+  useEffect(() => {
+    fetchNews();
 
     // Check if anyone is live
     const socketUrl = getSocketUrl();
-    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+    const socket = io(socketUrl);
     socket.on("connect", () => socket.emit("get_broadcasters"));
     socket.on("broadcaster_list", (list: any[]) => {
       setIsLive(list.length > 0);
@@ -60,6 +82,52 @@ export default function Home() {
     };
   }, []);
 
+  const handlePublishNews = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsModerating(true);
+    setModerationError(null);
+
+    try {
+      // Moderation check
+      const moderation = await moderateContent(`${newNews.title} ${newNews.content}`, "news");
+      
+      if (!moderation.isAppropriate) {
+        setModerationError(moderation.reason || "El contenido no cumple con las normas de la comunidad.");
+        setIsModerating(false);
+        return;
+      }
+
+      const res = await fetch("/api/news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newNews)
+      });
+      if (res.ok) {
+        setNewNews({ title: "", content: "", imageUrl: "", videoUrl: "", password: "" });
+        setShowNewsForm(false);
+        fetchNews();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Error al publicar");
+      }
+    } catch (err) {
+      console.error("Error publishing news:", err);
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewNews({ ...newNews, imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col font-sans selection:bg-brand-primary selection:text-white">
       <Helmet>
@@ -80,10 +148,11 @@ export default function Home() {
             initial={{ scale: 1.1, opacity: 0 }}
             animate={{ scale: 1, opacity: 0.5 }}
             transition={{ duration: 2, ease: "easeOut" }}
-            src="https://picsum.photos/seed/mixe-landscape/1920/1080?brightness=50" 
+            src="https://picsum.photos/seed/mixe-landscape/1280/720?brightness=50" 
             alt="Sierra Mixe Paisaje" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
+            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-bg/20 via-brand-bg/60 to-brand-bg"></div>
           <div className="absolute inset-0 bg-gradient-to-r from-brand-bg/80 via-transparent to-transparent"></div>
@@ -208,10 +277,11 @@ export default function Home() {
               className="relative rounded-[3rem] overflow-hidden shadow-2xl border border-white/5 aspect-[4/3] md:aspect-video"
             >
               <img 
-                src="https://picsum.photos/seed/tlahuitoltepec-culture/1200/800" 
+                src="https://picsum.photos/seed/tlahuitoltepec-culture/800/600" 
                 alt="Santa María Tlahuitoltepec" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
+                loading="lazy"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent"></div>
               <div className="absolute bottom-10 left-10 right-10 flex items-center justify-between">
@@ -260,7 +330,7 @@ export default function Home() {
       </section>
 
       {/* News Section - Grid Layout */}
-      <section className="py-32 px-6 bg-stone-950/50 border-y border-white/5">
+      <section className="py-32 px-6 bg-stone-950/50 border-y border-white/5 relative overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
             <div className="space-y-4">
@@ -270,11 +340,128 @@ export default function Home() {
               </div>
               <h2 className="text-5xl font-black text-white tracking-tighter">Noticias de la Sierra</h2>
             </div>
-            <Link to="/admin-news" className="group flex items-center gap-2 text-neutral-500 hover:text-white font-bold text-sm transition-all">
-              <span>Panel Administrativo</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setShowNewsForm(!showNewsForm)}
+                className="group flex items-center gap-2 px-6 py-3 bg-brand-primary/20 text-brand-primary border border-brand-primary/30 rounded-xl font-bold text-sm transition-all hover:bg-brand-primary hover:text-white"
+              >
+                <Newspaper className="w-4 h-4" />
+                <span>{showNewsForm ? "Cerrar Formulario" : "Publicar Noticia"}</span>
+              </button>
+              <Link to="/admin-news" className="group flex items-center gap-2 text-neutral-500 hover:text-white font-bold text-sm transition-all">
+                <span>Panel Admin</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
           </div>
+
+          <AnimatePresence>
+            {showNewsForm && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="mb-16 overflow-hidden"
+              >
+                <form onSubmit={handlePublishNews} className="bg-brand-surface border border-white/10 rounded-3xl p-8 space-y-6 max-w-2xl mx-auto shadow-2xl">
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">Nueva Publicación</h3>
+                  <div className="grid gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="Título de la noticia" 
+                      required
+                      value={newNews.title}
+                      onChange={e => setNewNews({...newNews, title: e.target.value})}
+                      className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors"
+                    />
+                    <textarea 
+                      placeholder="Contenido de la noticia..." 
+                      required
+                      value={newNews.content}
+                      onChange={e => setNewNews({...newNews, content: e.target.value})}
+                      className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors min-h-[120px]"
+                    />
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">Imagen (Archivo o URL)</label>
+                        <div className="flex gap-2">
+                          <label className="flex-1 flex items-center justify-center gap-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white cursor-pointer hover:border-brand-primary transition-colors">
+                            <Upload className="w-4 h-4" />
+                            <span className="text-sm truncate">{newNews.imageUrl && newNews.imageUrl.startsWith('data:') ? 'Imagen seleccionada' : 'Subir archivo'}</span>
+                            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                          </label>
+                          <input 
+                            type="url" 
+                            placeholder="O pega URL" 
+                            value={newNews.imageUrl && !newNews.imageUrl.startsWith('data:') ? newNews.imageUrl : ''}
+                            onChange={e => setNewNews({...newNews, imageUrl: e.target.value})}
+                            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">Video (URL)</label>
+                        <input 
+                          type="url" 
+                          placeholder="URL de Video" 
+                          value={newNews.videoUrl}
+                          onChange={e => setNewNews({...newNews, videoUrl: e.target.value})}
+                          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {newNews.imageUrl && (
+                      <div className="relative aspect-video rounded-xl overflow-hidden border border-white/10">
+                        <img src={newNews.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <button 
+                          type="button"
+                          onClick={() => setNewNews({...newNews, imageUrl: ""})}
+                          className="absolute top-2 right-2 p-1 bg-black/60 text-white rounded-full hover:bg-red-500 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    <input 
+                      type="password" 
+                      placeholder="Contraseña de administrador (mixe2024)" 
+                      required
+                      value={newNews.password}
+                      onChange={e => setNewNews({...newNews, password: e.target.value})}
+                      className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors"
+                    />
+                  </div>
+
+                  {moderationError && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm"
+                    >
+                      <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+                      <p>{moderationError}</p>
+                    </motion.div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={isModerating}
+                    className="w-full py-4 bg-brand-primary text-white font-black rounded-xl hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isModerating ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Moderando contenido...</span>
+                      </>
+                    ) : (
+                      "Publicar Ahora"
+                    )}
+                  </button>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
             {news.length > 0 ? (
@@ -285,21 +472,39 @@ export default function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
-                  className="group bg-brand-surface/40 backdrop-blur-md border border-white/5 rounded-[2rem] p-10 hover:border-brand-primary/30 transition-all hover:-translate-y-2"
+                  className="group bg-brand-surface/40 backdrop-blur-md border border-white/5 rounded-[2rem] overflow-hidden hover:border-brand-primary/30 transition-all hover:-translate-y-2 flex flex-col"
                 >
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-full text-[10px] font-black uppercase tracking-widest">
-                      {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  {(item.imageUrl || item.videoUrl) && (
+                    <div className="relative aspect-video overflow-hidden">
+                      {item.videoUrl ? (
+                        <video src={item.videoUrl} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                      ) : (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.title} 
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                          referrerPolicy="no-referrer" 
+                          loading="lazy"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-brand-surface via-transparent to-transparent opacity-60"></div>
                     </div>
-                    <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Por {item.author}</span>
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-6 group-hover:text-brand-primary transition-colors leading-tight">{item.title}</h3>
-                  <p className="text-neutral-400 text-sm leading-relaxed line-clamp-4 font-medium mb-8">
-                    {item.content}
-                  </p>
-                  <div className="pt-6 border-t border-white/5 flex items-center gap-2 text-brand-primary font-bold text-xs group-hover:gap-4 transition-all">
-                    <span>Leer más</span>
-                    <ChevronRight className="w-4 h-4" />
+                  )}
+                  <div className="p-10 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </div>
+                      <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Por {item.author}</span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-6 group-hover:text-brand-primary transition-colors leading-tight">{item.title}</h3>
+                    <p className="text-neutral-400 text-sm leading-relaxed line-clamp-4 font-medium mb-8">
+                      {item.content}
+                    </p>
+                    <div className="mt-auto pt-6 border-t border-white/5 flex items-center gap-2 text-brand-primary font-bold text-xs group-hover:gap-4 transition-all">
+                      <span>Leer más</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
                   </div>
                 </motion.div>
               ))
@@ -309,6 +514,69 @@ export default function Home() {
                 <p className="text-neutral-500 font-bold uppercase tracking-widest text-sm">No hay noticias en el horizonte</p>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* Facebook Feed Section */}
+      <section className="py-32 px-6 bg-brand-bg relative overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-[#1877F2] font-bold uppercase tracking-[0.3em] text-xs">
+                <div className="w-8 h-[1px] bg-[#1877F2]"></div>
+                <span>Redes Sociales</span>
+              </div>
+              <h2 className="text-5xl font-black text-white tracking-tighter">Facebook Feed</h2>
+            </div>
+            <a href="https://facebook.com" target="_blank" rel="noreferrer" className="group flex items-center gap-2 text-neutral-500 hover:text-white font-bold text-sm transition-all">
+              <span>Seguir en Facebook</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </a>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Mock Facebook Posts */}
+            {[1, 2, 3].map((i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="bg-white rounded-2xl overflow-hidden shadow-xl text-black"
+              >
+                <div className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-brand-primary rounded-full flex items-center justify-center text-white font-black">V</div>
+                  <div>
+                    <h4 className="text-sm font-bold">Vida Mixe TV</h4>
+                    <p className="text-[10px] text-neutral-500 font-medium">Hace {i * 2} horas • <Users className="inline w-2 h-2" /></p>
+                  </div>
+                </div>
+                <div className="px-4 pb-4">
+                  <p className="text-sm leading-relaxed mb-4">
+                    {i === 1 ? "¡Increíble tarde en Tlahuitoltepec! La banda municipal ensayando para la fiesta patronal. #CulturaMixe #Ayuuk" : 
+                     i === 2 ? "No te pierdas nuestra transmisión especial mañana a las 10 AM desde el CECAM. Estaremos platicando con los nuevos talentos." : 
+                     "Gracias a todos los que se conectaron ayer. Somos una comunidad que crece cada día más allá de las fronteras."}
+                  </p>
+                </div>
+                <div className="aspect-square bg-neutral-100">
+                  <img 
+                    src={`https://picsum.photos/seed/fb-post-${i}/400/400`} 
+                    alt="Facebook Post" 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer" 
+                    loading="lazy"
+                  />
+                </div>
+                <div className="p-4 border-t border-neutral-100 flex items-center justify-between text-neutral-500">
+                  <div className="flex items-center gap-4">
+                    <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">Me gusta</span>
+                    <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">Comentar</span>
+                  </div>
+                  <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">Compartir</span>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>

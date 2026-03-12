@@ -143,7 +143,6 @@ export default function View() {
     const socketUrl = getSocketUrl();
 
     const s = io(socketUrl, {
-      transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Socket } from "socket.io-client";
-import { Send, Trash2, User } from "lucide-react";
+import { Send, Trash2, User, Loader2, ShieldAlert } from "lucide-react";
+import { moderateContent } from "../services/moderationService";
 
 export interface ChatMessage {
   id: string;
@@ -18,6 +19,8 @@ interface ChatProps {
 export default function Chat({ socket, isHost = false, transparent = false }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isModerating, setIsModerating] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [isUsernameSet, setIsUsernameSet] = useState(isHost);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -54,19 +57,38 @@ export default function Chat({ socket, isHost = false, transparent = false }: Ch
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !socket || !isUsernameSet) return;
+    if (!newMessage.trim() || !socket || !isUsernameSet || isModerating) return;
 
-    const message: ChatMessage = {
-      id: Math.random().toString(36).substring(2, 15),
-      username,
-      text: newMessage.trim(),
-      timestamp: Date.now(),
-    };
+    setIsModerating(true);
+    setModerationError(null);
 
-    socket.emit("chat_message", message);
-    setNewMessage("");
+    try {
+      const moderation = await moderateContent(newMessage.trim(), "chat");
+      
+      if (!moderation.isAppropriate) {
+        setModerationError(moderation.reason || "Mensaje bloqueado por moderación.");
+        // Clear error after 3 seconds
+        setTimeout(() => setModerationError(null), 3000);
+        setIsModerating(false);
+        return;
+      }
+
+      const message: ChatMessage = {
+        id: Math.random().toString(36).substring(2, 15),
+        username,
+        text: newMessage.trim(),
+        timestamp: Date.now(),
+      };
+
+      socket.emit("chat_message", message);
+      setNewMessage("");
+    } catch (err) {
+      console.error("Error sending message:", err);
+    } finally {
+      setIsModerating(false);
+    }
   };
 
   const handleDeleteMessage = (messageId: string) => {
@@ -160,21 +182,32 @@ export default function Chat({ socket, isHost = false, transparent = false }: Ch
       </div>
 
       <div className={`p-4 border-t ${transparent ? 'bg-black/20 border-white/10' : 'bg-zinc-900 border-zinc-800'}`}>
+        {moderationError && (
+          <div className="mb-2 px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-[10px] flex items-center gap-2">
+            <ShieldAlert className="w-3 h-3" />
+            <span>{moderationError}</span>
+          </div>
+        )}
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Escribe un mensaje..."
-            className={`flex-1 ${transparent ? 'bg-black/50 border-white/10' : 'bg-zinc-950 border-zinc-800'} border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors`}
+            disabled={isModerating}
+            placeholder={isModerating ? "Moderando..." : "Escribe un mensaje..."}
+            className={`flex-1 ${transparent ? 'bg-black/50 border-white/10' : 'bg-zinc-950 border-zinc-800'} border rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors disabled:opacity-50`}
             maxLength={200}
           />
           <button
             type="submit"
-            disabled={!newMessage.trim()}
-            className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl transition-colors flex-shrink-0"
+            disabled={!newMessage.trim() || isModerating}
+            className="p-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-xl transition-colors flex-shrink-0 flex items-center justify-center min-w-[40px]"
           >
-            <Send className="w-5 h-5" />
+            {isModerating ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </button>
         </form>
       </div>

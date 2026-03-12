@@ -1,77 +1,52 @@
+import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { Users, Mail, Linkedin, Twitter, Github, Heart, Camera, Music, Code, Mic2 } from "lucide-react";
+import { Users, Mail, Linkedin, Twitter, Github, Heart, Camera, Music, Code, Mic2, Loader2 } from "lucide-react";
 
 interface TeamMember {
+  id: string;
   name: string;
   role: string;
   bio: string;
   image: string;
-  icon: any;
-  socials: {
-    linkedin?: string;
-    twitter?: string;
-    github?: string;
-    email?: string;
-  };
+  icon: string;
+  linkedin?: string;
+  twitter?: string;
+  github?: string;
+  email?: string;
 }
 
-const team: TeamMember[] = [
-  {
-    name: "Xunashi Martínez",
-    role: "Directora General",
-    bio: "Originaria de Tlahuitoltepec, Xunashi lidera la visión de Vida Mixe TV para llevar la cultura Ayuuk a audiencias globales.",
-    image: "https://picsum.photos/seed/xunashi/400/400",
-    icon: Heart,
-    socials: {
-      linkedin: "#",
-      email: "xunashi@vidamixe.tv"
-    }
-  },
-  {
-    name: "Pável González",
-    role: "Director de Producción",
-    bio: "Especialista en medios audiovisuales con 10 años de experiencia documentando las fiestas y tradiciones de la Sierra Norte.",
-    image: "https://picsum.photos/seed/pavel/400/400",
-    icon: Camera,
-    socials: {
-      twitter: "#",
-      email: "pavel@vidamixe.tv"
-    }
-  },
-  {
-    name: "Floriberto Díaz",
-    role: "Ingeniero de Sonido",
-    bio: "Músico del CECAM encargado de capturar la esencia de las bandas de viento con la más alta fidelidad.",
-    image: "https://picsum.photos/seed/floriberto/400/400",
-    icon: Music,
-    socials: {
-      email: "flor@vidamixe.tv"
-    }
-  },
-  {
-    name: "Citlali Rojas",
-    role: "Desarrolladora de Plataforma",
-    bio: "Encargada de la infraestructura digital que permite nuestras transmisiones en tiempo real desde la montaña.",
-    image: "https://picsum.photos/seed/citlali/400/400",
-    icon: Code,
-    socials: {
-      github: "#",
-      linkedin: "#"
-    }
-  },
-  {
-    name: "Mateo Jiménez",
-    role: "Locutor y Traductor",
-    bio: "La voz de nuestras noticias en Ayuuk y Español, asegurando que nuestro mensaje llegue a todos los rincones.",
-    image: "https://picsum.photos/seed/mateo/400/400",
-    icon: Mic2,
-    socials: {
-      twitter: "#"
-    }
-  }
-];
+const iconMap: { [key: string]: any } = {
+  Heart,
+  Camera,
+  Music,
+  Code,
+  Mic2
+};
 
 export default function Team() {
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/team")
+      .then(res => res.json())
+      .then(data => {
+        setTeam(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching team:", err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-brand-bg text-neutral-50 font-sans">
       <Helmet>
@@ -109,7 +84,7 @@ export default function Team() {
       <div className="max-w-7xl mx-auto px-6 pb-24">
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {team.map((member, index) => {
-            const Icon = member.icon;
+            const Icon = iconMap[member.icon] || Heart;
             return (
               <div 
                 key={index} 
@@ -145,23 +120,23 @@ export default function Team() {
                   </p>
 
                   <div className="flex items-center gap-4 pt-4 border-t border-white/5">
-                    {member.socials.email && (
-                      <a href={`mailto:${member.socials.email}`} className="text-neutral-500 hover:text-white transition-colors">
+                    {member.email && (
+                      <a href={`mailto:${member.email}`} className="text-neutral-500 hover:text-white transition-colors">
                         <Mail className="w-5 h-5" />
                       </a>
                     )}
-                    {member.socials.linkedin && (
-                      <a href={member.socials.linkedin} className="text-neutral-500 hover:text-white transition-colors">
+                    {member.linkedin && (
+                      <a href={member.linkedin} className="text-neutral-500 hover:text-white transition-colors">
                         <Linkedin className="w-5 h-5" />
                       </a>
                     )}
-                    {member.socials.twitter && (
-                      <a href={member.socials.twitter} className="text-neutral-500 hover:text-white transition-colors">
+                    {member.twitter && (
+                      <a href={member.twitter} className="text-neutral-500 hover:text-white transition-colors">
                         <Twitter className="w-5 h-5" />
                       </a>
                     )}
-                    {member.socials.github && (
-                      <a href={member.socials.github} className="text-neutral-500 hover:text-white transition-colors">
+                    {member.github && (
+                      <a href={member.github} className="text-neutral-500 hover:text-white transition-colors">
                         <Github className="w-5 h-5" />
                       </a>
                     )}
