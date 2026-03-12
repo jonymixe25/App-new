@@ -6,8 +6,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { getSocketUrl } from "../utils/socket";
 import LivePreview from "../components/LivePreview";
 import { getRecordings, SavedRecording } from "../utils/videoStorage";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles, ArrowRight, ChevronRight, Upload, Image as ImageIcon, ShieldAlert, Loader2 } from "lucide-react";
-import { moderateContent } from "../services/moderationService";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles, ArrowRight, ChevronRight, Upload, Image as ImageIcon } from "lucide-react";
 
 interface NewsItem {
   id: string;
@@ -25,26 +24,15 @@ export default function Home() {
   const [randomVideo, setRandomVideo] = useState<SavedRecording | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isModerating, setIsModerating] = useState(false);
-  const [moderationError, setModerationError] = useState<string | null>(null);
 
   // News form state
   const [showNewsForm, setShowNewsForm] = useState(false);
   const [newNews, setNewNews] = useState({ title: "", content: "", imageUrl: "", videoUrl: "", password: "" });
 
   const fetchNews = () => {
-    // Basic session cache check
-    const cachedNews = sessionStorage.getItem("vida_mixe_news");
-    if (cachedNews && news.length === 0) {
-      setNews(JSON.parse(cachedNews));
-    }
-
     fetch("/api/news")
       .then(res => res.json())
-      .then(data => {
-        setNews(data);
-        sessionStorage.setItem("vida_mixe_news", JSON.stringify(data));
-      })
+      .then(data => setNews(data))
       .catch(err => console.error("Error fetching news:", err));
   };
 
@@ -84,19 +72,7 @@ export default function Home() {
 
   const handlePublishNews = async (e: FormEvent) => {
     e.preventDefault();
-    setIsModerating(true);
-    setModerationError(null);
-
     try {
-      // Moderation check
-      const moderation = await moderateContent(`${newNews.title} ${newNews.content}`, "news");
-      
-      if (!moderation.isAppropriate) {
-        setModerationError(moderation.reason || "El contenido no cumple con las normas de la comunidad.");
-        setIsModerating(false);
-        return;
-      }
-
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,8 +88,6 @@ export default function Home() {
       }
     } catch (err) {
       console.error("Error publishing news:", err);
-    } finally {
-      setIsModerating(false);
     }
   };
 
@@ -148,11 +122,10 @@ export default function Home() {
             initial={{ scale: 1.1, opacity: 0 }}
             animate={{ scale: 1, opacity: 0.5 }}
             transition={{ duration: 2, ease: "easeOut" }}
-            src="https://picsum.photos/seed/mixe-landscape/1280/720?brightness=50" 
+            src="https://picsum.photos/seed/mixe-landscape/1920/1080?brightness=50" 
             alt="Sierra Mixe Paisaje" 
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
-            loading="eager"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-brand-bg/20 via-brand-bg/60 to-brand-bg"></div>
           <div className="absolute inset-0 bg-gradient-to-r from-brand-bg/80 via-transparent to-transparent"></div>
@@ -277,11 +250,10 @@ export default function Home() {
               className="relative rounded-[3rem] overflow-hidden shadow-2xl border border-white/5 aspect-[4/3] md:aspect-video"
             >
               <img 
-                src="https://picsum.photos/seed/tlahuitoltepec-culture/800/600" 
+                src="https://picsum.photos/seed/tlahuitoltepec-culture/1200/800" 
                 alt="Santa María Tlahuitoltepec" 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"
-                loading="lazy"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent"></div>
               <div className="absolute bottom-10 left-10 right-10 flex items-center justify-between">
@@ -432,31 +404,8 @@ export default function Home() {
                       className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors"
                     />
                   </div>
-
-                  {moderationError && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm"
-                    >
-                      <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                      <p>{moderationError}</p>
-                    </motion.div>
-                  )}
-
-                  <button 
-                    type="submit" 
-                    disabled={isModerating}
-                    className="w-full py-4 bg-brand-primary text-white font-black rounded-xl hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isModerating ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Moderando contenido...</span>
-                      </>
-                    ) : (
-                      "Publicar Ahora"
-                    )}
+                  <button type="submit" className="w-full py-4 bg-brand-primary text-white font-black rounded-xl hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20">
+                    Publicar Ahora
                   </button>
                 </form>
               </motion.div>
@@ -479,13 +428,7 @@ export default function Home() {
                       {item.videoUrl ? (
                         <video src={item.videoUrl} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                       ) : (
-                        <img 
-                          src={item.imageUrl} 
-                          alt={item.title} 
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                          referrerPolicy="no-referrer" 
-                          loading="lazy"
-                        />
+                        <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-brand-surface via-transparent to-transparent opacity-60"></div>
                     </div>
@@ -560,13 +503,7 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="aspect-square bg-neutral-100">
-                  <img 
-                    src={`https://picsum.photos/seed/fb-post-${i}/400/400`} 
-                    alt="Facebook Post" 
-                    className="w-full h-full object-cover" 
-                    referrerPolicy="no-referrer" 
-                    loading="lazy"
-                  />
+                  <img src={`https://picsum.photos/seed/fb-post-${i}/600/600`} alt="Facebook Post" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <div className="p-4 border-t border-neutral-100 flex items-center justify-between text-neutral-500">
                   <div className="flex items-center gap-4">
