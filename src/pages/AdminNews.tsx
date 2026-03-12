@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Save, Trash2, Plus, Lock, Newspaper, User, FileText, Video, Image as ImageIcon, DollarSign, Link as LinkIcon, ShieldAlert, Loader2, Users } from "lucide-react";
-import { moderateContent } from "../services/moderationService";
+import { ArrowLeft, Save, Trash2, Plus, Lock, Newspaper, User, FileText, Video, Image as ImageIcon, DollarSign, Link as LinkIcon } from "lucide-react";
 
 interface NewsItem {
   id: string;
@@ -21,24 +20,10 @@ interface CommunityVideo {
   video_url: string;
 }
 
-interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  bio: string;
-  image: string;
-  icon: string;
-  linkedin?: string;
-  twitter?: string;
-  github?: string;
-  email?: string;
-}
-
 export default function AdminNews() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [videos, setVideos] = useState<CommunityVideo[]>([]);
-  const [team, setTeam] = useState<TeamMember[]>([]);
-  const [activeTab, setActiveTab] = useState<"news" | "videos" | "team">("news");
+  const [activeTab, setActiveTab] = useState<"news" | "videos">("news");
   const [password, setPassword] = useState("");
   const [isAuthorized, setIsAuthorized] = useState(false);
   
@@ -54,26 +39,13 @@ export default function AdminNews() {
   const [vPrice, setVPrice] = useState("");
   const [vUrl, setVUrl] = useState("");
 
-  // Team Form
-  const [tName, setTName] = useState("");
-  const [tRole, setTRole] = useState("");
-  const [tBio, setTBio] = useState("");
-  const [tImage, setTImage] = useState("");
-  const [tIcon, setTIcon] = useState("Heart");
-  const [tLinkedin, setTLinkedin] = useState("");
-  const [tTwitter, setTTwitter] = useState("");
-  const [tGithub, setTGithub] = useState("");
-  const [tEmail, setTEmail] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [moderationError, setModerationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthorized) {
       fetchNews();
       fetchVideos();
-      fetchTeam();
     }
   }, [isAuthorized]);
 
@@ -97,16 +69,6 @@ export default function AdminNews() {
     }
   };
 
-  const fetchTeam = async () => {
-    try {
-      const res = await fetch("/api/team");
-      const data = await res.json();
-      setTeam(data);
-    } catch (err) {
-      console.error("Error fetching team:", err);
-    }
-  };
-
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (password === "mixe2024") {
@@ -121,17 +83,8 @@ export default function AdminNews() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setModerationError(null);
 
     try {
-      // Moderation check
-      const moderation = await moderateContent(`${title} ${content}`, "news");
-      if (!moderation.isAppropriate) {
-        setModerationError(moderation.reason || "El contenido de la noticia no cumple con las normas.");
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,17 +108,8 @@ export default function AdminNews() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setModerationError(null);
 
     try {
-      // Moderation check for video title
-      const moderation = await moderateContent(vTitle, "news");
-      if (!moderation.isAppropriate) {
-        setModerationError(moderation.reason || "El título del video no cumple con las normas.");
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch("/api/community-videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,63 +163,6 @@ export default function AdminNews() {
 
       if (!res.ok) throw new Error("Error al eliminar video");
       fetchVideos();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  const handleTeamSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          name: tName, 
-          role: tRole, 
-          bio: tBio, 
-          image: tImage, 
-          icon: tIcon,
-          linkedin: tLinkedin,
-          twitter: tTwitter,
-          github: tGithub,
-          email: tEmail,
-          password 
-        })
-      });
-
-      if (!res.ok) throw new Error("Error al agregar miembro");
-
-      setTName("");
-      setTRole("");
-      setTBio("");
-      setTImage("");
-      setTIcon("Heart");
-      setTLinkedin("");
-      setTTwitter("");
-      setTGithub("");
-      setTEmail("");
-      fetchTeam();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleTeamDelete = async (id: string) => {
-    if (!confirm("¿Estás seguro de eliminar este miembro del equipo?")) return;
-
-    try {
-      const res = await fetch(`/api/team/${id}?password=${password}`, {
-        method: "DELETE"
-      });
-
-      if (!res.ok) throw new Error("Error al eliminar miembro");
-      fetchTeam();
     } catch (err: any) {
       setError(err.message);
     }
@@ -349,12 +236,6 @@ export default function AdminNews() {
             >
               Videos
             </button>
-            <button 
-              onClick={() => setActiveTab("team")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "team" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
-            >
-              Equipo
-            </button>
           </div>
           <button 
             onClick={() => setIsAuthorized(false)}
@@ -419,13 +300,6 @@ export default function AdminNews() {
                     </div>
                   </div>
 
-                  {moderationError && (
-                    <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
-                      <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                      <p>{moderationError}</p>
-                    </div>
-                  )}
-
                   {error && <p className="text-red-500 text-sm">{error}</p>}
 
                   <button 
@@ -433,7 +307,7 @@ export default function AdminNews() {
                     disabled={loading}
                     className="w-full bg-brand-primary hover:bg-brand-primary/80 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    {loading ? <Plus className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                     Publicar Noticia
                   </button>
                 </form>
@@ -472,7 +346,7 @@ export default function AdminNews() {
               )}
             </div>
           </div>
-        ) : activeTab === "videos" ? (
+        ) : (
           <div className="grid lg:grid-cols-3 gap-12">
             {/* Video Form Column */}
             <div className="lg:col-span-1">
@@ -558,13 +432,6 @@ export default function AdminNews() {
                     </div>
                   </div>
 
-                  {moderationError && (
-                    <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 text-sm">
-                      <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-                      <p>{moderationError}</p>
-                    </div>
-                  )}
-
                   {error && <p className="text-red-500 text-sm">{error}</p>}
 
                   <button 
@@ -572,7 +439,7 @@ export default function AdminNews() {
                     disabled={loading}
                     className="w-full bg-brand-secondary hover:bg-brand-secondary/80 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg shadow-brand-secondary/20 flex items-center justify-center gap-2"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                    {loading ? <Plus className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                     Publicar Video
                   </button>
                 </form>
@@ -609,169 +476,6 @@ export default function AdminNews() {
                 <div className="text-center py-20 bg-brand-surface/50 border border-dashed border-white/5 rounded-3xl">
                   <Video className="w-12 h-12 text-neutral-700 mx-auto mb-4" />
                   <p className="text-neutral-500">No hay videos publicados aún.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="grid lg:grid-cols-3 gap-12">
-            {/* Team Form Column */}
-            <div className="lg:col-span-1">
-              <div className="bg-brand-surface border border-white/5 rounded-3xl p-6 sticky top-12">
-                <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-brand-primary" />
-                  Nuevo Miembro
-                </h2>
-                
-                <form onSubmit={handleTeamSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Nombre</label>
-                    <input 
-                      type="text"
-                      required
-                      value={tName}
-                      onChange={(e) => setTName(e.target.value)}
-                      placeholder="Nombre completo"
-                      className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Rol / Cargo</label>
-                    <input 
-                      type="text"
-                      required
-                      value={tRole}
-                      onChange={(e) => setTRole(e.target.value)}
-                      placeholder="Ej. Director de Producción"
-                      className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Biografía Corta</label>
-                    <textarea 
-                      required
-                      rows={3}
-                      value={tBio}
-                      onChange={(e) => setTBio(e.target.value)}
-                      placeholder="Breve descripción..."
-                      className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all resize-none"
-                    ></textarea>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">URL Imagen</label>
-                    <input 
-                      type="url"
-                      required
-                      value={tImage}
-                      onChange={(e) => setTImage(e.target.value)}
-                      placeholder="https://picsum.photos/..."
-                      className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Icono</label>
-                      <select 
-                        value={tIcon}
-                        onChange={(e) => setTIcon(e.target.value)}
-                        className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                      >
-                        <option value="Heart">Corazón</option>
-                        <option value="Camera">Cámara</option>
-                        <option value="Music">Música</option>
-                        <option value="Code">Código</option>
-                        <option value="Mic2">Micrófono</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email</label>
-                      <input 
-                        type="email"
-                        value={tEmail}
-                        onChange={(e) => setTEmail(e.target.value)}
-                        placeholder="email@vidamixe.tv"
-                        className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">LinkedIn</label>
-                      <input 
-                        type="text"
-                        value={tLinkedin}
-                        onChange={(e) => setTLinkedin(e.target.value)}
-                        placeholder="#"
-                        className="w-full bg-brand-bg border border-white/5 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Twitter</label>
-                      <input 
-                        type="text"
-                        value={tTwitter}
-                        onChange={(e) => setTTwitter(e.target.value)}
-                        placeholder="#"
-                        className="w-full bg-brand-bg border border-white/5 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">GitHub</label>
-                      <input 
-                        type="text"
-                        value={tGithub}
-                        onChange={(e) => setTGithub(e.target.value)}
-                        placeholder="#"
-                        className="w-full bg-brand-bg border border-white/5 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {error && <p className="text-red-500 text-[10px]">{error}</p>}
-
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-brand-primary hover:bg-brand-primary/80 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2 text-sm"
-                  >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                    Guardar Miembro
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {/* Team List Column */}
-            <div className="lg:col-span-2 space-y-4">
-              <h2 className="text-xl font-bold text-white mb-6">Nuestro Equipo</h2>
-              {team.length > 0 ? (
-                team.map((member) => (
-                  <div key={member.id} className="bg-brand-surface border border-white/5 rounded-3xl p-4 flex gap-4 items-center group">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0">
-                      <img src={member.image} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-bold text-white truncate group-hover:text-brand-primary transition-colors">{member.name}</h3>
-                      <p className="text-brand-secondary text-xs font-medium uppercase tracking-wider">{member.role}</p>
-                    </div>
-                    <button 
-                      onClick={() => handleTeamDelete(member.id)}
-                      className="p-2 text-neutral-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
-                      title="Eliminar miembro"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-20 bg-brand-surface/50 border border-dashed border-white/5 rounded-3xl">
-                  <Users className="w-12 h-12 text-neutral-700 mx-auto mb-4" />
-                  <p className="text-neutral-500">No hay miembros registrados.</p>
                 </div>
               )}
             </div>

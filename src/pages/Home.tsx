@@ -53,7 +53,7 @@ export default function Home() {
 
     // Check if anyone is live
     const socketUrl = getSocketUrl();
-    const socket = io(socketUrl);
+    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
     socket.on("connect", () => socket.emit("get_broadcasters"));
     socket.on("broadcaster_list", (list: any[]) => {
       setIsLive(list.length > 0);

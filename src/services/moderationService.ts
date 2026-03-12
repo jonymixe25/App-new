@@ -1,14 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const getApiKey = () => {
-  try {
-    return process.env.GEMINI_API_KEY || "";
-  } catch {
-    return "";
-  }
-};
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 export interface ModerationResult {
   isAppropriate: boolean;
