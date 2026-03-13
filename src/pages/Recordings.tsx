@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Trash2, Download, Play, Clock, FileVideo, Calendar, Upload, ShoppingCart } from "lucide-react";
 import { getRecordings, deleteRecording, saveRecording, SavedRecording } from "../utils/videoStorage";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function Recordings() {
   const [recordings, setRecordings] = useState<SavedRecording[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     loadRecordings();
@@ -40,12 +42,12 @@ export default function Recordings() {
         loadRecordings();
       } catch (error) {
         console.error("Error saving uploaded video:", error);
-        alert("Error al guardar el video.");
+        alert(t.recordings.errorSaving);
       }
     };
 
     video.onerror = () => {
-      alert("No se pudo cargar el video. Asegúrate de que el formato sea compatible.");
+      alert(t.recordings.errorLoading);
     };
 
     video.src = URL.createObjectURL(file);
@@ -53,7 +55,7 @@ export default function Recordings() {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("¿Estás seguro de que deseas eliminar esta grabación?")) {
+    if (confirm(t.recordings.confirmDelete)) {
       await deleteRecording(id);
       loadRecordings();
       if (selectedVideo === id) setSelectedVideo(null);
@@ -95,12 +97,12 @@ export default function Recordings() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-white">Grabaciones Guardadas</h1>
+            <h1 className="text-3xl font-bold text-white">{t.recordings.title}</h1>
           </div>
           
           <label className="flex items-center gap-2 px-4 py-2 bg-brand-surface hover:bg-white/10 text-neutral-200 rounded-lg cursor-pointer transition-colors border border-white/5 shadow-sm">
             <Upload className="w-4 h-4" />
-            <span className="text-sm font-medium">Subir Video</span>
+            <span className="text-sm font-medium">{t.recordings.uploadVideo}</span>
             <input 
               type="file" 
               accept="video/*" 
@@ -116,19 +118,19 @@ export default function Recordings() {
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-xl font-semibold text-neutral-300 flex items-center gap-2">
               <FileVideo className="w-5 h-5" />
-              Historial
+              {t.recordings.history}
             </h2>
             
             {loading ? (
-              <div className="text-center py-8 text-neutral-500">Cargando...</div>
+              <div className="text-center py-8 text-neutral-500">{t.recordings.loading}</div>
             ) : recordings.length === 0 ? (
               <div className="bg-brand-surface border border-white/5 rounded-xl p-8 text-center space-y-3">
                 <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto text-neutral-500">
                   <FileVideo className="w-6 h-6" />
                 </div>
-                <p className="text-neutral-400">No hay grabaciones guardadas.</p>
+                <p className="text-neutral-400">{t.recordings.noRecordings}</p>
                 <Link to="/admin" className="text-brand-primary hover:text-brand-primary/80 text-sm font-medium">
-                  Ir a transmitir para grabar
+                  {t.recordings.goToAdmin}
                 </Link>
               </div>
             ) : (
@@ -163,24 +165,24 @@ export default function Recordings() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          alert(`Iniciando proceso de compra para: ${rec.name}`);
+                          alert(`${t.recordings.buyVideo}: ${rec.name}`);
                         }}
                         className="p-2 hover:bg-brand-primary/10 rounded-lg text-brand-primary transition-colors"
-                        title="Comprar video"
+                        title={t.recordings.buyVideo}
                       >
                         <ShoppingCart className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => handleDownload(rec, e)}
                         className="p-2 hover:bg-white/10 rounded-lg text-neutral-400 hover:text-white transition-colors"
-                        title="Descargar"
+                        title={t.recordings.download}
                       >
                         <Download className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => handleDelete(rec.id, e)}
                         className="p-2 hover:bg-red-500/10 rounded-lg text-neutral-400 hover:text-red-400 transition-colors"
-                        title="Eliminar"
+                        title={t.recordings.delete}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -210,20 +212,20 @@ export default function Recordings() {
                       <div className="p-6 bg-brand-surface">
                         <h2 className="text-2xl font-bold text-white mb-2">{video.name}</h2>
                         <p className="text-neutral-400 text-sm mb-4">
-                          Grabado el {formatDate(video.date)}
+                          {t.recordings.recordedOn} {formatDate(video.date)}
                         </p>
                         <div className="flex gap-3">
                           <button
                             onClick={(e) => handleDownload(video, e)}
                             className="px-4 py-2 bg-brand-surface hover:bg-white/10 text-white rounded-lg font-medium flex items-center gap-2 transition-colors border border-white/5"
                           >
-                            <Download className="w-4 h-4" /> Descargar
+                            <Download className="w-4 h-4" /> {t.recordings.download}
                           </button>
                           <button
-                            onClick={() => alert(`Iniciando proceso de compra para: ${video.name}`)}
+                            onClick={() => alert(`${t.recordings.buyVideo}: ${video.name}`)}
                             className="px-6 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white rounded-lg font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-primary/20"
                           >
-                            <ShoppingCart className="w-4 h-4" /> Comprar video
+                            <ShoppingCart className="w-4 h-4" /> {t.recordings.buyVideo}
                           </button>
                         </div>
                       </div>
@@ -234,8 +236,8 @@ export default function Recordings() {
             ) : (
               <div className="h-full min-h-[400px] flex flex-col items-center justify-center bg-white/5 border-2 border-dashed border-white/5 rounded-2xl text-neutral-600 p-8 text-center">
                 <Play className="w-16 h-16 mb-4 opacity-50" />
-                <h3 className="text-xl font-medium mb-2">Selecciona una grabación</h3>
-                <p>Elige un video de la lista para reproducirlo o descargarlo.</p>
+                <h3 className="text-xl font-medium mb-2">{t.recordings.selectVideo}</h3>
+                <p>{t.recordings.selectVideoDesc}</p>
               </div>
             )}
           </div>

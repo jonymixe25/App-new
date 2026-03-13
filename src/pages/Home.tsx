@@ -86,7 +86,7 @@ export default function Home() {
         fetchNews();
       } else {
         const data = await res.json();
-        alert(data.error || "Error al publicar");
+        alert(data.error || t.home.publishError);
       }
     } catch (err) {
       console.error("Error publishing news:", err);
@@ -107,8 +107,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col font-sans selection:bg-brand-primary selection:text-white">
       <Helmet>
-        <title>Vida Mixe TV | Inicio - La Región de los Jamás Conquistados</title>
-        <meta name="description" content="Conectando a la comunidad Ayuuk con el mundo. Transmisiones en vivo desde el corazón de la sierra de Oaxaca." />
+        <title>{t.home.metaTitle}</title>
+        <meta name="description" content={t.home.metaDesc} />
       </Helmet>
 
       {/* Atmospheric Background Layer */}
@@ -163,7 +163,7 @@ export default function Home() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                     </span>
-                    <span className="text-xs font-black tracking-widest uppercase">En Vivo</span>
+                    <span className="text-xs font-black tracking-widest uppercase">{t.home.liveNow}</span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -232,7 +232,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Estado Actual</p>
-                    <p className="text-sm font-bold text-white">{isLive ? 'Transmisión Activa' : 'Próximamente'}</p>
+                    <p className="text-sm font-bold text-white">{isLive ? t.home.statusActive : t.home.statusComingSoon}</p>
                   </div>
                 </div>
               </div>
@@ -260,8 +260,8 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-brand-bg via-transparent to-transparent"></div>
               <div className="absolute bottom-10 left-10 right-10 flex items-center justify-between">
                 <div className="bg-black/40 backdrop-blur-xl border border-white/10 px-6 py-3 rounded-2xl">
-                  <p className="text-xs font-bold tracking-widest uppercase text-brand-primary">Ubicación</p>
-                  <p className="text-xl font-black text-white">Sierra Norte, Oaxaca</p>
+                  <p className="text-xs font-bold tracking-widest uppercase text-brand-primary">{t.news.location}</p>
+                  <p className="text-xl font-black text-white">{t.news.locationName}</p>
                 </div>
               </div>
             </motion.div>
@@ -271,16 +271,16 @@ export default function Home() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-brand-secondary font-bold uppercase tracking-[0.3em] text-xs">
                 <div className="w-8 h-[1px] bg-brand-secondary"></div>
-                <span>Cuna de Músicos</span>
+                <span>{t.news.mixeSymphony}</span>
               </div>
               <h2 className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-tight">
-                Santa María <br />
-                <span className="italic font-light text-neutral-300">Tlahuitoltepec</span>
+                {t.news.musiciansTitle} <br />
+                <span className="italic font-light text-neutral-300">{t.news.musiciansSubtitle}</span>
               </h2>
             </div>
             
             <p className="text-lg text-neutral-400 leading-relaxed font-medium">
-              El corazón palpitante de la cultura Ayuuk. Aquí, la música no es solo arte, es el lenguaje de la resistencia y la identidad. Hogar del **CECAM**, donde cada nota cuenta la historia de un pueblo que nunca fue conquistado.
+              {t.news.musiciansDesc}
             </p>
 
             <div className="grid grid-cols-2 gap-8 pt-6">
@@ -288,15 +288,15 @@ export default function Home() {
                 <div className="w-14 h-14 bg-brand-primary/10 text-brand-primary rounded-2xl flex items-center justify-center">
                   <Music className="w-7 h-7" />
                 </div>
-                <h4 className="text-white font-bold">Sinfonía Mixe</h4>
-                <p className="text-xs text-neutral-500 leading-relaxed">Bandas de viento que resuenan en las nubes.</p>
+                <h4 className="text-white font-bold">{t.news.mixeSymphony}</h4>
+                <p className="text-xs text-neutral-500 leading-relaxed">{t.news.mixeSymphonyDesc}</p>
               </div>
               <div className="space-y-3">
                 <div className="w-14 h-14 bg-brand-secondary/10 text-brand-secondary rounded-2xl flex items-center justify-center">
                   <Mountain className="w-7 h-7" />
                 </div>
-                <h4 className="text-white font-bold">Altitud Sagrada</h4>
-                <p className="text-xs text-neutral-500 leading-relaxed">Tradiciones preservadas en la cima de la sierra.</p>
+                <h4 className="text-white font-bold">{t.news.sacredAltitude}</h4>
+                <p className="text-xs text-neutral-500 leading-relaxed">{t.news.sacredAltitudeDesc}</p>
               </div>
             </div>
           </div>
@@ -310,9 +310,9 @@ export default function Home() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-brand-accent font-bold uppercase tracking-[0.3em] text-xs">
                 <div className="w-8 h-[1px] bg-brand-accent"></div>
-                <span>Actualidad Ayuuk</span>
+                <span>{t.news.subtitle}</span>
               </div>
-              <h2 className="text-5xl font-black text-white tracking-tighter">Noticias de la Sierra</h2>
+              <h2 className="text-5xl font-black text-white tracking-tighter">{t.news.title}</h2>
             </div>
             <div className="flex items-center gap-4">
               <button 
@@ -320,10 +320,10 @@ export default function Home() {
                 className="group flex items-center gap-2 px-6 py-3 bg-brand-primary/20 text-brand-primary border border-brand-primary/30 rounded-xl font-bold text-sm transition-all hover:bg-brand-primary hover:text-white"
               >
                 <Newspaper className="w-4 h-4" />
-                <span>{showNewsForm ? "Cerrar Formulario" : "Publicar Noticia"}</span>
+                <span>{showNewsForm ? t.news.closeForm : t.news.publishNews}</span>
               </button>
               <Link to="/admin-news" className="group flex items-center gap-2 text-neutral-500 hover:text-white font-bold text-sm transition-all">
-                <span>Panel Admin</span>
+                <span>{t.home.adminPanel}</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
@@ -338,18 +338,18 @@ export default function Home() {
                 className="mb-16 overflow-hidden"
               >
                 <form onSubmit={handlePublishNews} className="bg-brand-surface border border-white/10 rounded-3xl p-8 space-y-6 max-w-2xl mx-auto shadow-2xl">
-                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">Nueva Publicación</h3>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">{t.news.newPost}</h3>
                   <div className="grid gap-4">
                     <input 
                       type="text" 
-                      placeholder="Título de la noticia" 
+                      placeholder={t.news.newsTitle} 
                       required
                       value={newNews.title}
                       onChange={e => setNewNews({...newNews, title: e.target.value})}
                       className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors"
                     />
                     <textarea 
-                      placeholder="Contenido de la noticia..." 
+                      placeholder={t.news.newsContent} 
                       required
                       value={newNews.content}
                       onChange={e => setNewNews({...newNews, content: e.target.value})}
@@ -357,16 +357,16 @@ export default function Home() {
                     />
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">Imagen (Archivo o URL)</label>
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">{t.news.imageLabel}</label>
                         <div className="flex gap-2">
                           <label className="flex-1 flex items-center justify-center gap-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white cursor-pointer hover:border-brand-primary transition-colors">
                             <Upload className="w-4 h-4" />
-                            <span className="text-sm truncate">{newNews.imageUrl && newNews.imageUrl.startsWith('data:') ? 'Imagen seleccionada' : 'Subir archivo'}</span>
+                            <span className="text-sm truncate">{newNews.imageUrl && newNews.imageUrl.startsWith('data:') ? t.news.imageSelected : t.news.uploadFile}</span>
                             <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                           </label>
                           <input 
                             type="url" 
-                            placeholder="O pega URL" 
+                            placeholder={t.news.pasteUrl} 
                             value={newNews.imageUrl && !newNews.imageUrl.startsWith('data:') ? newNews.imageUrl : ''}
                             onChange={e => setNewNews({...newNews, imageUrl: e.target.value})}
                             className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors text-sm"
@@ -374,10 +374,10 @@ export default function Home() {
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">Video (URL)</label>
+                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest ml-1">{t.news.videoUrl}</label>
                         <input 
                           type="url" 
-                          placeholder="URL de Video" 
+                          placeholder={t.news.videoUrl} 
                           value={newNews.videoUrl}
                           onChange={e => setNewNews({...newNews, videoUrl: e.target.value})}
                           className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-colors text-sm"
@@ -399,7 +399,7 @@ export default function Home() {
                     )}
                     <input 
                       type="password" 
-                      placeholder="Contraseña de administrador (mixe2024)" 
+                      placeholder={t.news.adminPassword} 
                       required
                       value={newNews.password}
                       onChange={e => setNewNews({...newNews, password: e.target.value})}
@@ -407,7 +407,7 @@ export default function Home() {
                     />
                   </div>
                   <button type="submit" className="w-full py-4 bg-brand-primary text-white font-black rounded-xl hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20">
-                    Publicar Ahora
+                    {t.news.publishNow}
                   </button>
                 </form>
               </motion.div>
@@ -440,14 +440,14 @@ export default function Home() {
                       <div className="px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-full text-[10px] font-black uppercase tracking-widest">
                         {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </div>
-                      <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Por {item.author}</span>
+                      <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">{t.home.by} {item.author}</span>
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-6 group-hover:text-brand-primary transition-colors leading-tight">{item.title}</h3>
                     <p className="text-neutral-400 text-sm leading-relaxed line-clamp-4 font-medium mb-8">
                       {item.content}
                     </p>
                     <div className="mt-auto pt-6 border-t border-white/5 flex items-center gap-2 text-brand-primary font-bold text-xs group-hover:gap-4 transition-all">
-                      <span>Leer más</span>
+                      <span>{t.news.readMore}</span>
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </div>
@@ -456,7 +456,7 @@ export default function Home() {
             ) : (
               <div className="col-span-full text-center py-24 bg-white/5 rounded-[3rem] border border-dashed border-white/10">
                 <CloudFog className="w-12 h-12 text-neutral-700 mx-auto mb-4" />
-                <p className="text-neutral-500 font-bold uppercase tracking-widest text-sm">No hay noticias en el horizonte</p>
+                <p className="text-neutral-500 font-bold uppercase tracking-widest text-sm">{t.news.noNews}</p>
               </div>
             )}
           </div>
@@ -470,12 +470,12 @@ export default function Home() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-[#1877F2] font-bold uppercase tracking-[0.3em] text-xs">
                 <div className="w-8 h-[1px] bg-[#1877F2]"></div>
-                <span>Redes Sociales</span>
+                <span>{t.news.facebookSubtitle}</span>
               </div>
-              <h2 className="text-5xl font-black text-white tracking-tighter">Facebook Feed</h2>
+              <h2 className="text-5xl font-black text-white tracking-tighter">{t.news.facebookTitle}</h2>
             </div>
             <a href="https://facebook.com" target="_blank" rel="noreferrer" className="group flex items-center gap-2 text-neutral-500 hover:text-white font-bold text-sm transition-all">
-              <span>Seguir en Facebook</span>
+              <span>{t.news.followFacebook}</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </a>
           </div>
@@ -509,10 +509,10 @@ export default function Home() {
                 </div>
                 <div className="p-4 border-t border-neutral-100 flex items-center justify-between text-neutral-500">
                   <div className="flex items-center gap-4">
-                    <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">Me gusta</span>
-                    <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">Comentar</span>
+                    <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">{t.home.like}</span>
+                    <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">{t.home.comment}</span>
                   </div>
-                  <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">Compartir</span>
+                  <span className="text-xs font-bold hover:text-[#1877F2] cursor-pointer">{t.home.share}</span>
                 </div>
               </motion.div>
             ))}
@@ -534,18 +534,18 @@ export default function Home() {
           </div>
           
           <div className="flex flex-wrap justify-center gap-8">
-            <Link to="/" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">Inicio</Link>
-            <Link to="/view" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">Transmisiones</Link>
-            <Link to="/recordings" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">Archivo</Link>
-            <Link to="/team" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">Equipo</Link>
+            <Link to="/" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">{t.nav.home}</Link>
+            <Link to="/view" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">{t.view.availableStreams}</Link>
+            <Link to="/recordings" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">{t.recordings.history}</Link>
+            <Link to="/team" className="text-xs font-bold uppercase tracking-widest text-neutral-400 hover:text-brand-primary transition-colors">{t.team.title}</Link>
           </div>
 
           <div className="text-center md:text-right space-y-2">
             <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">
-              © {new Date().getFullYear()} Vida Mixe TV
+              © {new Date().getFullYear()} {t.news.footerCopyright}
             </p>
             <p className="text-[10px] text-neutral-600 font-medium">
-              Hecho con ❤️ en la Sierra Norte de Oaxaca
+              {t.news.footerMadeWith}
             </p>
           </div>
         </div>
@@ -582,7 +582,7 @@ export default function Home() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-brand-primary">
                       <Sparkles className="w-4 h-4 fill-brand-primary animate-pulse" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.3em]">Recuerdo Mixe</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.3em]">{t.news.memoryTitle}</span>
                     </div>
                     <h4 className="text-lg font-black text-white line-clamp-1 uppercase tracking-tight">{randomVideo.name}</h4>
                   </div>
@@ -602,7 +602,7 @@ export default function Home() {
                   </span>
                 </div>
                 <Link to="/recordings" className="text-[10px] text-brand-primary font-black uppercase tracking-widest hover:underline">
-                  Explorar Archivo
+                  {t.news.exploreArchive}
                 </Link>
               </div>
             </div>
