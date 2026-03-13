@@ -7,6 +7,7 @@ import { getSocketUrl } from "../utils/socket";
 import LivePreview from "../components/LivePreview";
 import { getRecordings, SavedRecording } from "../utils/videoStorage";
 import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles, ArrowRight, ChevronRight, Upload, Image as ImageIcon } from "lucide-react";
+import { useLanguage } from "../context/LanguageContext";
 
 interface NewsItem {
   id: string;
@@ -24,6 +25,7 @@ export default function Home() {
   const [randomVideo, setRandomVideo] = useState<SavedRecording | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   // News form state
   const [showNewsForm, setShowNewsForm] = useState(false);
@@ -174,8 +176,8 @@ export default function Home() {
                 transition={{ duration: 0.8, delay: 0.4 }}
                 className="text-7xl md:text-9xl font-black tracking-tighter text-white leading-[0.85] uppercase"
               >
-                Vida <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary to-emerald-400">Mixe</span> TV
+                {t.home.heroTitle.split(' ').slice(0, 2).join(' ')} <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary to-emerald-400">{t.home.heroTitle.split(' ').slice(2).join(' ')}</span>
               </motion.h1>
               
               <motion.p 
@@ -184,7 +186,7 @@ export default function Home() {
                 transition={{ duration: 0.8, delay: 0.6 }}
                 className="text-lg md:text-xl text-neutral-400 max-w-xl mx-auto lg:mx-0 font-medium leading-relaxed"
               >
-                Un puente digital entre la herencia ancestral Ayuuk y el mundo moderno. Transmitiendo la esencia de la Sierra Norte.
+                {t.home.heroSubtitle}
               </motion.p>
             </div>
 
@@ -200,7 +202,7 @@ export default function Home() {
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                 <MonitorPlay className="w-6 h-6" />
-                <span>Explorar Transmisiones</span>
+                <span>{t.home.cta}</span>
                 <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               
@@ -209,7 +211,7 @@ export default function Home() {
                 className="inline-flex items-center justify-center gap-3 px-10 py-5 bg-white/5 border border-white/10 text-white font-bold rounded-2xl hover:bg-white/10 transition-all backdrop-blur-md active:scale-95"
               >
                 <Users className="w-6 h-6" />
-                <span>Nuestro Equipo</span>
+                <span>{t.team.title}</span>
               </Link>
             </motion.div>
           </motion.div>

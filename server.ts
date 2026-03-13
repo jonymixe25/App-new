@@ -5,41 +5,178 @@ import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import Database from "better-sqlite3";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Database
+console.log("Initializing Database...");
+const db = new Database("vidamixe.db");
+
+// Create tables if they don't exist
+console.log("Creating tables...");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS news (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    author TEXT NOT NULL,
+    date TEXT NOT NULL,
+    imageUrl TEXT,
+    videoUrl TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS community_videos (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    thumbnail TEXT NOT NULL,
+    price TEXT NOT NULL,
+    video_url TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS broadcasters (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    name TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS team (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    bio TEXT NOT NULL,
+    image TEXT NOT NULL,
+    icon TEXT NOT NULL,
+    linkedin TEXT,
+    twitter TEXT,
+    github TEXT,
+    email TEXT
+  );
+`);
+
+console.log("Tables created successfully.");
+
+// Seed initial data if empty
+console.log("Checking news count...");
+const newsCount = db.prepare("SELECT COUNT(*) as count FROM news").get() as { count: number };
+if (newsCount.count === 0) {
+  db.prepare(`
+    INSERT INTO news (id, title, content, author, date, imageUrl)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    "1",
+    "Bienvenidos a Vida Mixe TV",
+    "Iniciamos transmisiones para conectar a la comunidad Ayuuk con el mundo. Sintoniza nuestras transmisiones en vivo desde la Sierra Norte.",
+    "Admin",
+    new Date().toISOString(),
+    "https://picsum.photos/seed/mixe-welcome/800/600"
+  );
+}
+
+const adminCount = db.prepare("SELECT COUNT(*) as count FROM broadcasters").get() as { count: number };
+if (adminCount.count === 0) {
+  db.prepare(`
+    INSERT INTO broadcasters (id, username, password, name)
+    VALUES (?, ?, ?, ?)
+  `).run("1", "admin", "password123", "Administrador");
+}
+
+console.log("Checking team count...");
+const teamCount = db.prepare("SELECT COUNT(*) as count FROM team").get() as { count: number };
+if (teamCount.count === 0) {
+  console.log("Seeding initial team data...");
+  const initialTeam = [
+    {
+      id: "1",
+      name: "Xunashi Martínez",
+      role: "Directora General",
+      bio: "Originaria de Tlahuitoltepec, Xunashi lidera la visión de Vida Mixe TV para llevar la cultura Ayuuk a audiencias globales.",
+      image: "https://picsum.photos/seed/xunashi/400/400",
+      icon: "Heart",
+      linkedin: "#",
+      email: "xunashi@vidamixe.tv"
+    },
+    {
+      id: "2",
+      name: "Pável González",
+      role: "Director de Producción",
+      bio: "Especialista en medios audiovisuales con 10 años de experiencia documentando las fiestas y tradiciones de la Sierra Norte.",
+      image: "https://picsum.photos/seed/pavel/400/400",
+      icon: "Camera",
+      twitter: "#",
+      email: "pavel@vidamixe.tv"
+    },
+    {
+      id: "3",
+      name: "Floriberto Díaz",
+      role: "Ingeniero de Sonido",
+      bio: "Músico del CECAM encargado de capturar la esencia de las bandas de viento con la más alta fidelidad.",
+      image: "https://picsum.photos/seed/floriberto/400/400",
+      icon: "Music",
+      email: "flor@vidamixe.tv"
+    },
+    {
+      id: "4",
+      name: "Citlali Rojas",
+      role: "Desarrolladora de Plataforma",
+      bio: "Encargada de la infraestructura digital que permite nuestras transmisiones en tiempo real desde la montaña.",
+      image: "https://picsum.photos/seed/citlali/400/400",
+      icon: "Code",
+      github: "#",
+      linkedin: "#"
+    },
+    {
+      id: "5",
+      name: "Mateo Jiménez",
+      role: "Locutor y Traductor",
+      bio: "La voz de nuestras noticias en Ayuuk y Español, asegurando que nuestro mensaje llegue a todos los rincones.",
+      image: "https://picsum.photos/seed/mateo/400/400",
+      icon: "Mic2",
+      twitter: "#"
+    }
+  ];
+
+  const insertTeam = db.prepare(`
+    INSERT INTO team (id, name, role, bio, image, icon, linkedin, twitter, github, email)
+    VALUES (@id, @name, @role, @bio, @image, @icon, @linkedin, @twitter, @github, @email)
+  `);
+
+  for (const member of initialTeam) {
+    insertTeam.run({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      bio: member.bio,
+      image: member.image,
+      icon: member.icon,
+      linkedin: member.linkedin || null,
+      twitter: member.twitter || null,
+      github: member.github || null,
+      email: member.email || null
+    });
+  }
+}
 
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
-  const PORT = parseInt(process.env.PORT || "3000", 10);
+  const PORT = 3000;
   const httpServer = createServer(app);
   
   const io = new Server(httpServer, {
     cors: {
       origin: "*",
       methods: ["GET", "POST"]
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
-  // News storage
-  let news: any[] = [
-    {
-      id: "1",
-      title: "Bienvenidos a Vida Mixe TV",
-      content: "Iniciamos transmisiones para conectar a la comunidad Ayuuk con el mundo. Sintoniza nuestras transmisiones en vivo desde la Sierra Norte.",
-      date: new Date().toISOString(),
-      author: "Admin",
-      imageUrl: "https://picsum.photos/seed/mixe-welcome/800/600"
-    }
-  ];
-
-  // User storage for broadcasters
-  let broadcasters_accounts: any[] = [
-    { id: "1", username: "admin", password: "password123", name: "Administrador" }
-  ];
-
   // Almacenar broadcasters: socket.id -> { id, name, viewers }
-  const broadcasters = new Map<string, { id: string, name: string, viewers: number }>();
+  const activeBroadcasters = new Map<string, { id: string, name: string, viewers: number }>();
   const chatHistory: any[] = [];
   // Almacenar usuarios conectados: socket.id -> { username, id }
   const users: { [id: string]: { username: string; id: string } } = {};
@@ -50,25 +187,26 @@ async function startServer() {
   };
 
   io.on("connection", (socket) => {
+    console.log("Client connected:", socket.id);
     socket.on("broadcaster", (streamName: string) => {
-      broadcasters.set(socket.id, { 
+      activeBroadcasters.set(socket.id, { 
         id: socket.id, 
         name: streamName || `Transmisión de ${socket.id.slice(0, 4)}`,
         viewers: 0 
       });
-      io.emit("broadcaster_list", Array.from(broadcasters.values()));
+      io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
     });
 
     socket.on("get_broadcasters", () => {
-      socket.emit("broadcaster_list", Array.from(broadcasters.values()));
+      socket.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
     });
 
     socket.on("watcher", (broadcasterId: string) => {
-      const b = broadcasters.get(broadcasterId);
+      const b = activeBroadcasters.get(broadcasterId);
       if (b) {
         socket.to(broadcasterId).emit("watcher", socket.id);
         b.viewers++;
-        io.emit("broadcaster_list", Array.from(broadcasters.values()));
+        io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
         // Emitir conteo específico al broadcaster
         io.to(broadcasterId).emit("viewers_count", b.viewers);
       }
@@ -89,8 +227,8 @@ async function startServer() {
 
     socket.on("delete_message", (messageId) => {
       // Solo el broadcaster de la sala actual o un admin podría borrar
-      // Por simplicidad, permitimos si el socket.id está en broadcasters
-      if (broadcasters.has(socket.id)) {
+      // Por simplicidad, permitimos si el socket.id está en activeBroadcasters
+      if (activeBroadcasters.has(socket.id)) {
         const index = chatHistory.findIndex(m => m.id === messageId);
         if (index !== -1) {
           chatHistory.splice(index, 1);
@@ -132,13 +270,13 @@ async function startServer() {
         emitUserList();
       }
 
-      if (broadcasters.has(socket.id)) {
-        broadcasters.delete(socket.id);
+      if (activeBroadcasters.has(socket.id)) {
+        activeBroadcasters.delete(socket.id);
         socket.broadcast.emit("disconnectPeer", socket.id);
-        io.emit("broadcaster_list", Array.from(broadcasters.values()));
+        io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
       } else {
         // Reducir viewers de todos los broadcasters donde este socket estaba mirando
-        broadcasters.forEach(b => {
+        activeBroadcasters.forEach(b => {
           socket.to(b.id).emit("disconnectPeer", socket.id);
           // Opcional: decrementar viewers si sabemos que estaba mirando
           // Por simplicidad, el cliente debería avisar al salir de una sala
@@ -155,26 +293,24 @@ async function startServer() {
 
   app.get("/api/news", (req, res) => {
     console.log("GET /api/news");
+    const news = db.prepare("SELECT * FROM news ORDER BY date DESC").all();
     res.json(news);
   });
 
   app.post("/api/news", (req, res) => {
     const { title, content, author, password, imageUrl, videoUrl } = req.body;
-    // Simple password check for admin
     if (password !== "mixe2024") {
       return res.status(401).json({ error: "No autorizado" });
     }
-    const newEntry = {
-      id: Date.now().toString(),
-      title,
-      content,
-      author: author || "Admin",
-      date: new Date().toISOString(),
-      imageUrl,
-      videoUrl
-    };
-    news.unshift(newEntry);
-    res.json(newEntry);
+    const id = Date.now().toString();
+    const date = new Date().toISOString();
+    
+    db.prepare(`
+      INSERT INTO news (id, title, content, author, date, imageUrl, videoUrl)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, title, content, author || "Admin", date, imageUrl || null, videoUrl || null);
+    
+    res.json({ id, title, content, author, date, imageUrl, videoUrl });
   });
 
   app.delete("/api/news/:id", (req, res) => {
@@ -183,29 +319,86 @@ async function startServer() {
     if (password !== "mixe2024") {
       return res.status(401).json({ error: "No autorizado" });
     }
-    news = news.filter(n => n.id !== id);
+    db.prepare("DELETE FROM news WHERE id = ?").run(id);
+    res.json({ success: true });
+  });
+
+  // Community Videos Routes
+  app.get("/api/community-videos", (req, res) => {
+    const videos = db.prepare("SELECT * FROM community_videos").all();
+    res.json(videos);
+  });
+
+  app.post("/api/community-videos", (req, res) => {
+    const { title, author, thumbnail, price, video_url, password } = req.body;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    const id = Date.now().toString();
+    db.prepare(`
+      INSERT INTO community_videos (id, title, author, thumbnail, price, video_url)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, title, author, thumbnail, price, video_url);
+    res.json({ id, title, author, thumbnail, price, video_url });
+  });
+
+  app.delete("/api/community-videos/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    db.prepare("DELETE FROM community_videos WHERE id = ?").run(id);
+    res.json({ success: true });
+  });
+
+  // Team Routes
+  app.get("/api/team", (req, res) => {
+    const team = db.prepare("SELECT * FROM team").all();
+    res.json(team);
+  });
+
+  app.post("/api/team", (req, res) => {
+    const { name, role, bio, image, icon, linkedin, twitter, github, email, password } = req.body;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    const id = Date.now().toString();
+    db.prepare(`
+      INSERT INTO team (id, name, role, bio, image, icon, linkedin, twitter, github, email)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, role, bio, image, icon, linkedin || null, twitter || null, github || null, email || null);
+    res.json({ id, name, role, bio, image, icon, linkedin, twitter, github, email });
+  });
+
+  app.delete("/api/team/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    db.prepare("DELETE FROM team WHERE id = ?").run(id);
     res.json({ success: true });
   });
 
   // Auth endpoints
   app.post("/api/auth/register", (req, res) => {
     const { username, password, name } = req.body;
-    if (broadcasters_accounts.find(u => u.username === username)) {
-      return res.status(400).json({ error: "El usuario ya existe" });
+    try {
+      const id = Date.now().toString();
+      db.prepare(`
+        INSERT INTO broadcasters (id, username, password, name)
+        VALUES (?, ?, ?, ?)
+      `).run(id, username, password, name || username);
+      res.json({ success: true, user: { id, username, name: name || username } });
+    } catch (err) {
+      res.status(400).json({ error: "El usuario ya existe" });
     }
-    const newUser = {
-      id: Date.now().toString(),
-      username,
-      password, // In a real app, hash this!
-      name: name || username
-    };
-    broadcasters_accounts.push(newUser);
-    res.json({ success: true, user: { id: newUser.id, username: newUser.username, name: newUser.name } });
   });
 
   app.post("/api/auth/login", (req, res) => {
     const { username, password } = req.body;
-    const user = broadcasters_accounts.find(u => u.username === username && u.password === password);
+    const user = db.prepare("SELECT * FROM broadcasters WHERE username = ? AND password = ?").get(username, password) as any;
     if (!user) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
@@ -237,4 +430,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});

@@ -1,5 +1,5 @@
 {
   "name": "Vida Mixe TV",
-  "description": "Plataforma de transmisión en vivo para la comunidad Mixe (Ayuuk). Conectando tradiciones, música y cultura de la Sierra Norte de Oaxaca con el mundo.",
+  "description": "Plataforma para la comunidad Mixe (Ayuuk) que permite administrar los miembros del equipo, conectando tradiciones y cultura.",
   "requestFramePermissions": ["camera", "microphone"]
 }
