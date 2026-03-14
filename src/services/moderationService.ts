@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -7,31 +7,52 @@ export interface ModerationResult {
   reason?: string;
 }
 
-export async function moderateContent(content: string, context: "chat" | "news" | "comment" = "chat"): Promise<ModerationResult> {
+export async function moderateContent(content: string, context: "chat" | "news"): Promise<ModerationResult> {
+  if (!content.trim()) return { isAppropriate: true };
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Act as a content moderator for a community television website (Vida Mixe TV). 
-      Analyze the following ${context} content and determine if it is appropriate for all ages.
-      It should not contain hate speech, explicit violence, sexual content, or severe harassment.
+      contents: `Eres un moderador de contenido para "Vida Mixe TV", un sitio web dedicado a la cultura Mixe.
+      Debes revisar si el siguiente contenido es apropiado para el contexto de ${context === "chat" ? "un chat en vivo" : "una publicación de noticias"}.
       
-      Content to analyze: "${content}"
+      Contenido: "${content}"
       
-      Respond ONLY with a JSON object in this format:
-      {
-        "isAppropriate": boolean,
-        "reason": "short explanation in Spanish if not appropriate, otherwise null"
-      }`,
+      Criterios de rechazo:
+      - Lenguaje ofensivo, insultos o discurso de odio.
+      - Contenido sexualmente explícito.
+      - Violencia gráfica o amenazas.
+      - Spam o estafas.
+      - Ataques personales.
+      
+      Responde únicamente en formato JSON.`,
       config: {
         responseMimeType: "application/json",
-      }
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isAppropriate: {
+              type: Type.BOOLEAN,
+              description: "True si el contenido es seguro y apropiado, false de lo contrario.",
+            },
+            reason: {
+              type: Type.STRING,
+              description: "Una breve explicación en español de por qué el contenido fue rechazado, si aplica.",
+            },
+          },
+          required: ["isAppropriate"],
+        },
+      },
     });
 
-    const result = JSON.parse(response.text || '{"isAppropriate": true}');
-    return result;
+    const text = response.text;
+    if (!text) throw new Error("No response from AI");
+    
+    return JSON.parse(text);
   } catch (error) {
-    console.error("Moderation error:", error);
-    // Default to allowing if moderation fails, to avoid blocking users due to API issues
+    console.error("Error en la moderación de contenido:", error);
+    // En caso de error técnico, permitimos el contenido para no romper la experiencia del usuario,
+    // pero lo registramos.
     return { isAppropriate: true };
   }
 }
