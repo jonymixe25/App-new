@@ -28,6 +28,7 @@ export default function LivePreview() {
   useEffect(() => {
     const socketUrl = getSocketUrl();
     const s = io(socketUrl, {
+      transports: ["websocket", "polling"],
       timeout: 10000,
     });
     setSocket(s);
