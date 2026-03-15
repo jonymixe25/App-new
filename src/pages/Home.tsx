@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin } from "lucide-react";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, Languages, Sparkles } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useEffect, useState } from "react";
 import LivePreview from "../components/LivePreview";
+import { useLanguage } from "../context/LanguageContext";
 
 interface NewsItem {
   id: string;
@@ -14,6 +15,7 @@ interface NewsItem {
 
 export default function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
+  const { t } = useLanguage();
 
   useEffect(() => {
     fetch("/api/news")
@@ -25,8 +27,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col font-sans">
       <Helmet>
-        <title>Vida Mixe TV | Inicio - La Región de los Jamás Conquistados</title>
-        <meta name="description" content="Conectando a la comunidad Ayuuk con el mundo. Transmisiones en vivo desde el corazón de la sierra de Oaxaca." />
+        <title>Vida Mixe TV | {t("nav_home")}</title>
+        <meta name="description" content={t("hero_description")} />
       </Helmet>
       {/* Hero Section */}
       <div className="relative min-h-[80vh] flex items-center justify-center overflow-hidden py-20">
@@ -44,7 +46,7 @@ export default function Home() {
           <div className="space-y-8 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-primary/20 border border-brand-primary/30 text-brand-primary backdrop-blur-sm">
               <CloudFog className="w-4 h-4" />
-              <span className="text-sm font-medium tracking-wide uppercase">La región de los jamás conquistados</span>
+              <span className="text-sm font-medium tracking-wide uppercase">{t("hero_subtitle")}</span>
             </div>
             
             <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-white leading-none">
@@ -52,7 +54,7 @@ export default function Home() {
             </h1>
             
             <p className="text-xl md:text-2xl text-neutral-300 max-w-2xl mx-auto lg:mx-0 font-light leading-relaxed">
-              Conectando a la comunidad Ayuuk con el mundo. Transmisiones en vivo desde el corazón de la sierra de Oaxaca.
+              {t("hero_description")}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-4">
@@ -61,7 +63,14 @@ export default function Home() {
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-semibold rounded-full transition-all shadow-lg shadow-brand-primary/40 hover:scale-105"
               >
                 <MonitorPlay className="w-5 h-5" />
-                Ver en Pantalla Completa
+                {t("hero_cta_view")}
+              </Link>
+              <Link
+                to="/traductor"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-full transition-all backdrop-blur-md border border-white/10 hover:scale-105"
+              >
+                <Languages className="w-5 h-5" />
+                {t("hero_cta_translator")}
               </Link>
             </div>
           </div>
@@ -90,11 +99,11 @@ export default function Home() {
           <div className="order-1 lg:order-2 space-y-6">
             <div className="flex items-center gap-2 text-brand-secondary font-semibold uppercase tracking-widest text-sm">
               <MapPin className="w-4 h-4" />
-              <span>Destacado de la Sierra</span>
+              <span>{t("section_featured_title")}</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">Santa María Tlahuitoltepec</h2>
+            <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight">{t("section_tlahui_title")}</h2>
             <p className="text-lg text-neutral-400 leading-relaxed">
-              Cuna de músicos y corazón de la cultura Ayuuk. Tlahuitoltepec es mundialmente reconocido por el **CECAM** (Centro de Capacitación Musical y Desarrollo de la Cultura Mixe), donde la música de banda se convierte en el alma del pueblo.
+              {t("section_tlahui_desc")}
             </p>
             <div className="grid sm:grid-cols-2 gap-6 pt-4">
               <div className="flex gap-4">
@@ -127,9 +136,9 @@ export default function Home() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-brand-accent font-semibold uppercase tracking-widest text-sm">
                 <Newspaper className="w-4 h-4" />
-                <span>Actualidad</span>
+                <span>{t("news_subtitle")}</span>
               </div>
-              <h2 className="text-4xl font-bold text-white">Noticias Comunitarias</h2>
+              <h2 className="text-4xl font-bold text-white">{t("news_title")}</h2>
             </div>
             <Link to="/admin-news" className="text-neutral-500 hover:text-white text-sm transition-colors">
               Acceso Admin
@@ -153,7 +162,7 @@ export default function Home() {
               ))
             ) : (
               <div className="col-span-full text-center py-12 text-neutral-500">
-                No hay noticias publicadas en este momento.
+                {t("news_empty")}
               </div>
             )}
           </div>
@@ -162,15 +171,15 @@ export default function Home() {
 
       {/* Features Section */}
       <div className="bg-brand-bg py-24 px-6 border-t border-white/5">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Card 1 */}
           <div className="bg-brand-surface border border-white/5 rounded-2xl p-8 hover:bg-brand-surface/80 transition-colors group">
             <div className="w-12 h-12 bg-brand-secondary/10 text-brand-secondary rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <Mountain className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-3">Cultura Viva</h3>
+            <h3 className="text-xl font-semibold text-white mb-3">{t("feature_culture_title")}</h3>
             <p className="text-neutral-400 leading-relaxed">
-              Difundiendo las tradiciones, música y lengua del pueblo Ayuuk. Un espacio para nuestras voces.
+              {t("feature_culture_desc")}
             </p>
           </div>
 
@@ -179,27 +188,41 @@ export default function Home() {
             <div className="w-12 h-12 bg-brand-primary/10 text-brand-primary rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <Users className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-3">Comunidad Global</h3>
+            <h3 className="text-xl font-semibold text-white mb-3">{t("feature_community_title")}</h3>
             <p className="text-neutral-400 leading-relaxed">
-              Acercando a los paisanos que están lejos. Mantente conectado con tu tierra y tu gente en tiempo real.
+              {t("feature_community_desc")}
             </p>
           </div>
 
           {/* Card 3 */}
           <div className="bg-brand-surface border border-white/5 rounded-2xl p-8 hover:bg-brand-surface/80 transition-colors group">
             <div className="w-12 h-12 bg-brand-accent/10 text-brand-accent rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <Languages className="w-6 h-6" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mb-3">{t("feature_translator_title")}</h3>
+            <p className="text-neutral-400 leading-relaxed">
+              {t("feature_translator_desc")}
+            </p>
+            <Link to="/traductor" className="inline-flex items-center gap-2 mt-4 text-brand-accent text-sm font-medium hover:underline">
+              {t("nav_translator")} <Sparkles className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {/* Card 4 */}
+          <div className="bg-brand-surface border border-white/5 rounded-2xl p-8 hover:bg-brand-surface/80 transition-colors group">
+            <div className="w-12 h-12 bg-brand-primary/10 text-brand-primary rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <MessageSquare className="w-6 h-6" />
             </div>
-            <h3 className="text-xl font-semibold text-white mb-3">Interacción Directa</h3>
+            <h3 className="text-xl font-semibold text-white mb-3">{t("feature_interaction_title")}</h3>
             <p className="text-neutral-400 leading-relaxed">
-              Participa en el chat en vivo y únete a las conversaciones. Tu opinión es parte de nuestra historia.
+              {t("feature_interaction_desc")}
             </p>
           </div>
         </div>
 
         <div className="mt-20 text-center border-t border-white/5 pt-12">
           <p className="text-neutral-500 text-sm">
-            © {new Date().getFullYear()} Vida Mixe TV. Hecho con ❤️ desde la Sierra Norte de Oaxaca.
+            © {new Date().getFullYear()} Vida Mixe TV. {t("footer_made_with")}
           </p>
         </div>
       </div>

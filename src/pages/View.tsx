@@ -4,6 +4,7 @@ import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, C
 import { Helmet } from "react-helmet-async";
 import Chat from "../components/Chat";
 import { getSocketUrl } from "../utils/socket";
+import { useLanguage } from "../context/LanguageContext";
 
 interface Broadcaster {
   id: string;
@@ -24,9 +25,11 @@ export default function View() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const { t } = useLanguage();
   
   // Private Call State
   const [incomingCall, setIncomingCall] = useState(false);
+  const [pendingOffer, setPendingOffer] = useState<{ callerId: string, description: RTCSessionDescriptionInit } | null>(null);
   const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
   const privatePeerConnection = useRef<RTCPeerConnection | null>(null);
   const [privateStream, setPrivateStream] = useState<MediaStream | null>(null);
@@ -57,47 +60,9 @@ export default function View() {
   };
 
   // Handle Private Call
-  const acceptPrivateCall = async () => {
-    if (!socket) return;
-    
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode }, 
-        audio: true 
-      });
-      setPrivateStream(stream);
-      
-      const pc = new RTCPeerConnection(config);
-      privatePeerConnection.current = pc;
-
-      stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
-      });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          // Send candidate back to broadcaster (who initiated the call)
-          // We need to know broadcaster ID, but for now we assume the offer came from broadcaster
-          // The server handles routing based on socket ID
-          // Wait, we need the caller ID. Let's store it in state when offer arrives.
-        }
-      };
-
-      // We need to handle the offer that was stored or passed
-      // This logic needs to be inside the socket event listener or state
-      
-      setIncomingCall(false);
-      setIsPrivateCallActive(true);
-      
-    } catch (err) {
-      console.error("Error accessing media for private call:", err);
-      alert("No se pudo acceder a la cámara/micrófono");
-      setIncomingCall(false);
-    }
-  };
-
   const rejectPrivateCall = () => {
     setIncomingCall(false);
+    setPendingOffer(null);
     // Optionally emit rejection event
   };
 
@@ -180,7 +145,7 @@ export default function View() {
     const socketUrl = getSocketUrl();
 
     const s = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,
@@ -195,15 +160,11 @@ export default function View() {
 
     s.on("broadcaster_list", (list: Broadcaster[]) => {
       setBroadcasters(list);
-      // Si no hay nada seleccionado y hay broadcasters, seleccionar el primero
-      if (list.length > 0 && !selectedBroadcasterId) {
-        // No seleccionamos automáticamente para dejar que el usuario elija
-      }
     });
 
     s.on("connect_error", (err) => {
       setIsConnected(false);
-      setSocketError(`Error al conectar con ${socketUrl}: ${err.message}`);
+      setSocketError(`${t.view.connectingDesc} ${socketUrl}: ${err.message}`);
       console.error("Socket connection error:", err);
     });
 
@@ -220,20 +181,8 @@ export default function View() {
 
     // Private Call Logic
     s.on("private_offer", async (callerId: string, description: RTCSessionDescriptionInit) => {
+      setPendingOffer({ callerId, description });
       setIncomingCall(true);
-      
-      // We need to define the accept function here to close over callerId and description
-      // Or store them in refs/state to be used by the UI handler
-      // For simplicity, let's auto-accept or handle via state if we want a UI prompt
-      // But the UI handler 'acceptPrivateCall' needs access to these.
-      
-      // Let's modify the strategy:
-      // 1. Store pending offer in ref
-      // 2. Show UI
-      // 3. On Accept, process the ref
-      
-      // Storing in a way accessible to the component scope
-      (window as any).pendingPrivateOffer = { callerId, description };
     });
 
     s.on("private_candidate", (callerId: string, candidate: RTCIceCandidateInit) => {
@@ -312,14 +261,13 @@ export default function View() {
       peerConnection.current?.close();
       endPrivateCall();
     };
-  }, []);
+  }, [selectedBroadcasterId]);
 
   // Real implementation of acceptPrivateCall that uses the stored offer
   const handleAcceptCall = async () => {
-    const pending = (window as any).pendingPrivateOffer;
-    if (!pending || !socket) return;
+    if (!pendingOffer || !socket) return;
     
-    const { callerId, description } = pending;
+    const { callerId, description } = pendingOffer;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -356,7 +304,7 @@ export default function View() {
   return (
     <div className="relative w-full h-[calc(100vh-64px)] bg-brand-bg text-neutral-50 overflow-hidden">
       <Helmet>
-        <title>Ver Transmisión en Vivo | Vida Mixe TV</title>
+        <title>{t.view.title} | Vida Mixe TV</title>
         <meta name="description" content="Mira las transmisiones en vivo de la comunidad Mixe. Únete al chat y participa en la conversación." />
       </Helmet>
       <div className="absolute inset-0 bg-black flex items-center justify-center">
@@ -375,22 +323,22 @@ export default function View() {
               <div className="w-16 h-16 bg-brand-primary/20 text-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                 <Phone className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Invitación a Video</h3>
+              <h3 className="text-xl font-bold mb-2">{t.view.videoInvitation}</h3>
               <p className="text-neutral-400 mb-6">
-                El anfitrión te está invitando a unirte a una videollamada privada.
+                {t.view.invitationDesc}
               </p>
               <div className="flex gap-3 justify-center">
                 <button 
                   onClick={rejectPrivateCall}
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors"
                 >
-                  Rechazar
+                  {t.view.reject}
                 </button>
                 <button 
                   onClick={handleAcceptCall}
                   className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
                 >
-                  <Phone className="w-4 h-4" /> Aceptar
+                  <Phone className="w-4 h-4" /> {t.view.accept}
                 </button>
               </div>
             </div>
@@ -401,11 +349,11 @@ export default function View() {
         {isPrivateCallActive && (
           <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-brand-primary/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
             <Phone className="w-4 h-4 text-white" />
-            <span className="text-sm font-medium text-white">En llamada privada con el anfitrión</span>
+            <span className="text-sm font-medium text-white">{t.view.privateCallActive}</span>
             <button 
               onClick={flipPrivateCamera}
               className="ml-2 p-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-              title="Voltear Cámara"
+              title={t.view.flipCamera}
             >
               <Camera className="w-3 h-3 text-white" />
             </button>
@@ -421,17 +369,17 @@ export default function View() {
         {/* Private Call Local Video Overlay */}
         {isPrivateCallActive && (
           <div className="absolute bottom-24 right-4 w-48 h-36 bg-brand-surface rounded-xl border border-white/10 shadow-2xl overflow-hidden z-30">
-             <video
+              <video
                 ref={privateVideoRef}
                 autoPlay
                 muted
                 playsInline
                 className="w-full h-full object-cover"
-             />
-             <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
-               <Users className="w-3 h-3 text-brand-primary" />
-               Tú
-             </div>
+              />
+              <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
+                <Users className="w-3 h-3 text-brand-primary" />
+                {t.view.you}
+              </div>
           </div>
         )}
 
@@ -440,8 +388,8 @@ export default function View() {
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 z-40">
             <div className="w-full max-w-2xl space-y-6">
               <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold text-white">Transmisiones Disponibles</h2>
-                <p className="text-neutral-400">Selecciona una transmisión para comenzar a ver</p>
+                <h2 className="text-3xl font-bold text-white">{t.view.availableStreams}</h2>
+                <p className="text-neutral-400">{t.view.selectToWatch}</p>
               </div>
               
               <div className="grid sm:grid-cols-2 gap-4">
@@ -457,13 +405,13 @@ export default function View() {
                       </div>
                       <div className="flex items-center gap-1.5 text-xs font-medium text-brand-primary bg-brand-primary/10 px-2 py-1 rounded">
                         <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-pulse"></span>
-                        EN VIVO
+                        {t.view.live}
                       </div>
                     </div>
                     <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">{b.name}</h3>
                     <div className="flex items-center gap-2 text-neutral-500 text-sm">
                       <Users className="w-4 h-4" />
-                      <span>{b.viewers} espectadores</span>
+                      <span>{b.viewers} {t.view.viewers}</span>
                     </div>
                   </button>
                 ))}
@@ -480,7 +428,7 @@ export default function View() {
               className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white text-sm font-bold rounded-full shadow-lg transition-all hover:scale-105"
             >
               <Facebook className="w-4 h-4" />
-              Compartir en Facebook
+              {t.view.shareFacebook}
             </button>
           </div>
         )}
@@ -494,13 +442,13 @@ export default function View() {
                     <div className="w-20 h-20 bg-white/5 text-neutral-400 rounded-full flex items-center justify-center mb-6">
                       <VideoOff className="w-10 h-10" />
                     </div>
-                    <h2 className="text-2xl font-semibold mb-2">Transmisión finalizada</h2>
+                    <h2 className="text-2xl font-semibold mb-2">{t.view.streamEnded}</h2>
                     <p className="text-neutral-400 mb-8 max-w-md">
-                      El transmisor ha finalizado el video en vivo o se ha perdido la conexión.
+                      {t.view.streamEndedDesc}
                     </p>
                     <div className="flex items-center gap-3 text-neutral-500">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Esperando que se reanude...</span>
+                      <span>{t.view.waitingResume}</span>
                     </div>
                   </>
                 ) : (
@@ -508,13 +456,13 @@ export default function View() {
                     <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6">
                       <MonitorPlay className="w-10 h-10" />
                     </div>
-                    <h2 className="text-2xl font-semibold mb-2">Esperando transmisión</h2>
+                    <h2 className="text-2xl font-semibold mb-2">{t.view.waitingStream}</h2>
                     <p className="text-neutral-400 mb-8 max-w-md">
-                      El transmisor aún no ha iniciado el video en vivo. La reproducción comenzará automáticamente.
+                      {t.view.waitingStartDesc}
                     </p>
                     <div className="flex items-center gap-3 text-brand-primary">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Conectado al servidor</span>
+                      <span>{t.view.connectedToServer}</span>
                     </div>
                   </>
                 )}
@@ -524,15 +472,15 @@ export default function View() {
                 <div className="w-20 h-20 bg-brand-secondary/10 text-brand-secondary rounded-full flex items-center justify-center mb-6">
                   <Loader2 className="w-10 h-10 animate-spin" />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">Conectando...</h2>
+                <h2 className="text-2xl font-semibold mb-2">{t.view.connecting}</h2>
                 <div className="text-neutral-400 mb-8 max-w-md text-center space-y-4">
-                  <p>{socketError || "Estableciendo conexión con el servidor de transmisión."}</p>
+                  <p>{socketError || t.view.connectingDesc}</p>
                   {socketError && (
                     <button 
                       onClick={() => window.location.reload()}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm"
                     >
-                      <RefreshCw className="w-4 h-4" /> Reintentar Conexión
+                      <RefreshCw className="w-4 h-4" /> {t.view.retryConnection}
                     </button>
                   )}
                 </div>
@@ -547,7 +495,7 @@ export default function View() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
             </span>
-            <span className="text-xs font-medium tracking-wider text-white uppercase">En Vivo</span>
+            <span className="text-xs font-medium tracking-wider text-white uppercase">{t.view.live}</span>
           </div>
         )}
       </div>

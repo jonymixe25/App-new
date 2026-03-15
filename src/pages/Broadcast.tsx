@@ -4,6 +4,7 @@ import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare,
 import { Helmet } from "react-helmet-async";
 import Chat from "../components/Chat";
 import { Link } from "react-router-dom";
+import { useLanguage } from "../context/LanguageContext";
 import { saveRecording } from "../utils/videoStorage";
 import { getSocketUrl } from "../utils/socket";
 
@@ -52,6 +53,7 @@ export default function Broadcast() {
   const [socketError, setSocketError] = useState<string | null>(null);
   const [streamName, setStreamName] = useState("");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const { t } = useLanguage();
 
   // Sound ref
   const notificationSound = useRef<HTMLAudioElement | null>(null);
@@ -187,7 +189,7 @@ export default function Broadcast() {
     mediaRecorder.onstop = async () => {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
       await saveRecording(blob, recordingTime);
-      alert("Grabación guardada con éxito. Puedes verla en la página de Grabaciones.");
+      alert(t.broadcast.recordingSaved);
     };
 
     mediaRecorder.start();
@@ -213,7 +215,7 @@ export default function Broadcast() {
     const socketUrl = getSocketUrl();
     
     const s = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       timeout: 20000,
@@ -224,13 +226,13 @@ export default function Broadcast() {
       setIsSocketConnected(true);
       setSocketError(null);
       if (isStreaming) {
-        s.emit("broadcaster");
+        s.emit("broadcaster", streamName || "Transmisión en vivo");
       }
     });
 
     s.on("connect_error", (err) => {
       setIsSocketConnected(false);
-      setSocketError(`Error al conectar con ${socketUrl}: ${err.message}`);
+      setSocketError(`${t.broadcast.socketError} ${socketUrl}: ${err.message}`);
       console.error("Socket connection error:", err);
     });
 
@@ -368,7 +370,7 @@ export default function Broadcast() {
       }
     } catch (err) {
       console.error("Error accessing media devices.", err);
-      setError("No se pudo acceder a la cámara o micrófono. Asegúrate de dar los permisos necesarios.");
+      setError(t.broadcast.cameraError);
     }
   };
 
@@ -461,7 +463,7 @@ export default function Broadcast() {
         
       } catch (err) {
         console.error("Error flipping camera:", err);
-        setError("No se pudo cambiar la cámara.");
+        setError(t.broadcast.cameraError);
       }
     }
   };
@@ -471,7 +473,7 @@ export default function Broadcast() {
   return (
     <div className="relative w-full h-[calc(100vh-64px)] bg-brand-bg text-neutral-50 overflow-hidden">
       <Helmet>
-        <title>Transmitir en Vivo | Vida Mixe TV</title>
+        <title>{t.broadcast.title} | Vida Mixe TV</title>
         <meta name="description" content="Panel de control para transmisiones en vivo. Comparte tu cultura y tradiciones con el mundo." />
       </Helmet>
       <div className="absolute inset-0 bg-black flex items-center justify-center">
@@ -512,9 +514,9 @@ export default function Broadcast() {
                 <div className="w-20 h-20 bg-brand-secondary/10 text-brand-secondary rounded-full flex items-center justify-center mb-6">
                   <Loader2 className="w-10 h-10 animate-spin" />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">Conectando al servidor...</h2>
+                <h2 className="text-2xl font-semibold mb-2">{t.broadcast.socketError}...</h2>
                 <div className="text-neutral-400 mb-8 max-w-md text-center space-y-4">
-                  <p>{socketError || "Estableciendo conexión en tiempo real. Por favor espera."}</p>
+                  <p>{socketError || t.broadcast.socketError}</p>
                   {socketError && (
                     <button 
                       onClick={() => window.location.reload()}
@@ -530,22 +532,22 @@ export default function Broadcast() {
                 <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6">
                   <Video className="w-10 h-10" />
                 </div>
-                <h2 className="text-2xl font-semibold mb-2">Listo para transmitir</h2>
+                <h2 className="text-2xl font-semibold mb-2">{t.broadcast.title}</h2>
                 <div className="w-full max-w-md space-y-4 mb-8">
                   <div className="text-left">
                     <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1.5 ml-1">
-                      Nombre de la Transmisión
+                      {t.broadcast.streamName}
                     </label>
                     <input 
                       type="text"
                       value={streamName}
                       onChange={(e) => setStreamName(e.target.value)}
-                      placeholder="Ej: Concierto en la Sierra, Noticias Ayuuk..."
+                      placeholder={t.broadcast.streamPlaceholder}
                       className="w-full bg-brand-surface border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
                     />
                   </div>
                   <p className="text-neutral-400 text-sm text-center">
-                    Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
+                    {t.broadcast.streamTip}
                   </p>
                 </div>
                 <div className="flex gap-4">
@@ -553,12 +555,12 @@ export default function Broadcast() {
                     onClick={startStream}
                     className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl transition-colors shadow-lg shadow-brand-primary/20"
                   >
-                    Iniciar Transmisión
+                    {t.broadcast.startStream}
                   </button>
                   <button
                     onClick={flipCamera}
                     className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/5"
-                    title="Voltear Cámara"
+                    title={t.broadcast.flipCamera}
                   >
                     <Camera className="w-6 h-6" />
                   </button>
@@ -577,14 +579,14 @@ export default function Broadcast() {
                   <span className={`relative inline-flex rounded-full h-2 w-2 ${isSocketConnected ? 'bg-brand-primary' : 'bg-brand-secondary'}`}></span>
                 </span>
                 <span className="text-xs font-medium tracking-wider text-white uppercase">
-                  {isSocketConnected ? 'En Vivo' : 'Reconectando...'}
+                  {isSocketConnected ? t.broadcast.live : t.broadcast.socketError}
                 </span>
               </div>
               <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
-                <Users className="w-4 h-4 text-brand-accent" /> {viewers}
+                <Users className="w-4 h-4 text-brand-accent" /> {viewers} {t.broadcast.viewers}
               </div>
               <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
-                <Clock className="w-4 h-4 text-brand-secondary" /> {formatUptime(uptime)}
+                <Clock className="w-4 h-4 text-brand-secondary" /> {t.broadcast.uptime}: {formatUptime(uptime)}
               </div>
               {isRecording && (
                 <div className="flex items-center gap-2 bg-brand-primary/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-brand-primary/50 text-xs font-medium text-brand-primary animate-pulse">
@@ -597,7 +599,7 @@ export default function Broadcast() {
               <button
                 onClick={toggleRecording}
                 className={`p-4 rounded-full transition-colors ${isRecording ? 'bg-brand-primary hover:bg-brand-primary/80 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
-                title={isRecording ? "Detener Grabación" : "Iniciar Grabación"}
+                title={isRecording ? t.broadcast.stopRecording : t.broadcast.startRecording}
               >
                 {isRecording ? <Square className="w-6 h-6 fill-current" /> : <Circle className="w-6 h-6 fill-brand-primary text-brand-primary" />}
               </button>
@@ -611,14 +613,14 @@ export default function Broadcast() {
               <button
                 onClick={toggleAudio}
                 className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-brand-primary hover:bg-brand-primary/80 text-white'}`}
-                title={audioEnabled ? "Silenciar Micrófono" : "Activar Micrófono"}
+                title={audioEnabled ? t.broadcast.mute : t.broadcast.unmute}
               >
                 {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
               </button>
               <button
                 onClick={flipCamera}
                 className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"
-                title="Voltear Cámara"
+                title={t.broadcast.flipCamera}
               >
                 <Camera className="w-6 h-6" />
               </button>
@@ -626,7 +628,7 @@ export default function Broadcast() {
                 onClick={stopStream}
                 className="px-6 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-full transition-colors ml-2"
               >
-                Detener
+                {t.broadcast.stopStream}
               </button>
             </div>
           </>
@@ -644,21 +646,21 @@ export default function Broadcast() {
         <Link
           to="/recordings"
           className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
-          title="Ver Grabaciones"
+          title={t.recordings.title}
         >
           <Save className="w-6 h-6" />
         </Link>
         <button
           onClick={() => setShowUserList(!showUserList)}
           className={`p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showUserList ? 'bg-brand-primary hover:bg-brand-primary/80' : 'bg-black/50 hover:bg-black/70'}`}
-          title="Ver espectadores"
+          title={t.broadcast.users}
         >
           <Users className="w-6 h-6" />
         </button>
         <button
           onClick={handleShare}
           className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
-          title="Copiar enlace de espectador"
+          title={t.broadcast.share}
         >
           {copied ? <Check className="w-6 h-6 text-brand-primary" /> : <Share2 className="w-6 h-6" />}
         </button>
@@ -685,11 +687,11 @@ export default function Broadcast() {
         }`}
       >
         <div className="p-3 border-b border-white/10 bg-black/20">
-          <h3 className="font-semibold text-sm">Espectadores ({connectedUsers.length})</h3>
+          <h3 className="font-semibold text-sm">{t.broadcast.users} ({connectedUsers.length})</h3>
         </div>
         <div className="max-h-64 overflow-y-auto p-2 space-y-1">
           {connectedUsers.length === 0 ? (
-            <p className="text-xs text-neutral-500 text-center py-4">No hay usuarios registrados</p>
+            <p className="text-xs text-neutral-500 text-center py-4">{t.broadcast.noUsers}</p>
           ) : (
             connectedUsers.map(user => (
               <div key={user.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors group">
@@ -698,7 +700,7 @@ export default function Broadcast() {
                   <button 
                     onClick={() => startPrivateCall(user)}
                     className="p-1.5 bg-brand-primary/20 text-brand-primary hover:bg-brand-primary hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                    title="Llamada privada"
+                    title={t.broadcast.inviteToCall}
                   >
                     <Phone className="w-3 h-3" />
                   </button>
