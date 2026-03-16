@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut } from "lucide-react";
+import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 
 const config = {
@@ -21,10 +21,15 @@ export default function Broadcast() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLive, setIsLive] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -87,8 +92,9 @@ export default function Broadcast() {
       socketRef.current?.disconnect();
       stream?.getTracks().forEach(track => track.stop());
       Object.values(peerConnections.current).forEach(pc => pc.close());
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [navigate]);
+  }, [navigate, stream]);
 
   const startBroadcast = async () => {
     try {
@@ -111,6 +117,7 @@ export default function Broadcast() {
   };
 
   const stopBroadcast = () => {
+    if (isRecording) stopRecording();
     stream?.getTracks().forEach(track => track.stop());
     setStream(null);
     setIsLive(false);
@@ -120,16 +127,75 @@ export default function Broadcast() {
 
   const toggleMute = () => {
     if (stream) {
-      stream.getAudioTracks().forEach(track => (track.enabled = !track.enabled));
-      setIsMuted(!isMuted);
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
     }
   };
 
   const toggleVideo = () => {
     if (stream) {
-      stream.getVideoTracks().forEach(track => (track.enabled = !track.enabled));
-      setIsVideoOff(!isVideoOff);
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsVideoOff(!videoTrack.enabled);
+      }
     }
+  };
+
+  const startRecording = () => {
+    if (!stream) return;
+
+    recordedChunksRef.current = [];
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "video/webm;codecs=vp9,opus"
+    });
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunksRef.current, {
+        type: "video/webm"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vida-mixe-broadcast-${new Date().toISOString()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    mediaRecorder.start();
+    mediaRecorderRef.current = mediaRecorder;
+    setIsRecording(true);
+    setRecordingTime(0);
+    timerRef.current = setInterval(() => {
+      setRecordingTime(prev => prev + 1);
+    }, 1000);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return [h, m, s].map(v => v < 10 ? "0" + v : v).filter((v, i) => v !== "00" || i > 0).join(":");
   };
 
   const sendMessage = (e: React.FormEvent) => {
@@ -181,46 +247,86 @@ export default function Broadcast() {
           )}
 
           {/* Overlay Controls */}
-          <div className="absolute top-6 left-6 flex items-center gap-4">
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border ${isLive ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-white/10 border-white/10 text-neutral-400'}`}>
-              <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-neutral-500'}`} />
-              <span className="text-xs font-bold uppercase tracking-widest">{isLive ? 'En Vivo' : 'Offline'}</span>
+          <div className="absolute top-6 left-6 flex flex-col gap-3">
+            <div className="flex items-center gap-4">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border ${isLive ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-white/10 border-white/10 text-neutral-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-neutral-500'}`} />
+                <span className="text-xs font-bold uppercase tracking-widest">{isLive ? 'En Vivo' : 'Offline'}</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white">
+                <Users className="w-4 h-4" />
+                <span className="text-xs font-bold">{viewers}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white">
-              <Users className="w-4 h-4" />
-              <span className="text-xs font-bold">{viewers}</span>
-            </div>
+            
+            {isRecording && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-600/20 border border-red-500 text-red-500 backdrop-blur-md w-fit">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest">Grabando: {formatTime(recordingTime)}</span>
+              </div>
+            )}
           </div>
 
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 px-8 py-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
-            <button 
-              onClick={toggleMute}
-              className={`p-4 rounded-full transition-all ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-            >
-              {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-            </button>
-            <button 
-              onClick={toggleVideo}
-              className={`p-4 rounded-full transition-all ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-            >
-              {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={toggleMute}
+                disabled={!stream}
+                className={`p-4 rounded-full transition-all disabled:opacity-50 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title={isMuted ? "Activar Micrófono" : "Silenciar Micrófono"}
+              >
+                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+              </button>
+              <button 
+                onClick={toggleVideo}
+                disabled={!stream}
+                className={`p-4 rounded-full transition-all disabled:opacity-50 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title={isVideoOff ? "Activar Cámara" : "Desactivar Cámara"}
+              >
+                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+              </button>
+            </div>
+
             <div className="w-px h-8 bg-white/10 mx-2" />
+
+            <div className="flex items-center gap-2">
+              {!isRecording ? (
+                <button 
+                  onClick={startRecording}
+                  disabled={!stream}
+                  className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all disabled:opacity-50"
+                  title="Iniciar Grabación"
+                >
+                  <Circle className="w-6 h-6 fill-red-500 text-red-500" />
+                </button>
+              ) : (
+                <button 
+                  onClick={stopRecording}
+                  className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all"
+                  title="Detener Grabación"
+                >
+                  <Square className="w-6 h-6 fill-white" />
+                </button>
+              )}
+            </div>
+
+            <div className="w-px h-8 bg-white/10 mx-2" />
+
             {!isLive ? (
               <button 
                 onClick={startBroadcast}
-                className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-full transition-all flex items-center gap-2"
+                className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-brand-primary/20"
               >
                 <Power className="w-5 h-5" />
-                Iniciar Transmisión
+                <span>Iniciar Transmisión</span>
               </button>
             ) : (
               <button 
                 onClick={stopBroadcast}
-                className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full transition-all flex items-center gap-2"
+                className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-red-600/20"
               >
                 <Power className="w-5 h-5" />
-                Detener
+                <span>Detener</span>
               </button>
             )}
           </div>
