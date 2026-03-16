@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { auth, logout as firebaseLogout } from "../firebase";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 
 interface User {
   id: string;
   email: string;
   name: string;
+  photoUrl?: string;
+  isFirebase?: boolean;
 }
 
 interface UserContextType {
@@ -17,37 +21,67 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const stored = localStorage.getItem("broadcaster_user");
+    return stored ? JSON.parse(stored) : null;
+  });
   const [loading, setLoading] = useState(true);
 
   const refreshUser = async () => {
-    try {
-      const res = await fetch("/api/auth/me");
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-      } else {
-        setUser(null);
-      }
-    } catch (err) {
-      setUser(null);
-    } finally {
-      setLoading(false);
+    setLoading(true);
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const userData = {
+        id: currentUser.uid,
+        email: currentUser.email || "",
+        name: currentUser.displayName || currentUser.email?.split('@')[0] || "Usuario",
+        photoUrl: currentUser.photoURL || undefined,
+        isFirebase: true
+      };
+      setUser(userData);
+      localStorage.setItem("broadcaster_user", JSON.stringify(userData));
     }
+    setLoading(false);
   };
 
   useEffect(() => {
-    refreshUser();
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        const userData = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuario",
+          photoUrl: firebaseUser.photoURL || undefined,
+          isFirebase: true
+        };
+        setUser(userData);
+        localStorage.setItem("broadcaster_user", JSON.stringify(userData));
+      } else {
+        // Only clear if the current user was a Firebase user
+        setUser(prev => {
+          if (prev?.isFirebase) {
+            localStorage.removeItem("broadcaster_user");
+            return null;
+          }
+          return prev;
+        });
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = (userData: User) => {
     setUser(userData);
+    localStorage.setItem("broadcaster_user", JSON.stringify(userData));
   };
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await firebaseLogout();
       setUser(null);
+      localStorage.removeItem("broadcaster_user");
     } catch (err) {
       console.error("Error logging out:", err);
     }

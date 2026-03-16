@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Mail, Lock, User, ArrowRight, Github, Chrome } from "lucide-react";
+import { X, Mail, Lock, User, ArrowRight, Chrome } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
+import { loginWithGoogle } from "../firebase";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -16,7 +17,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
-  const { login, refreshUser } = useUser();
+  const { login } = useUser();
 
   // Prevent scrolling when modal is open
   useEffect(() => {
@@ -29,18 +30,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
-
-  // Listen for OAuth success message
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        refreshUser();
-        onClose();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [refreshUser, onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,17 +62,16 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   const handleGoogleAuth = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch("/api/auth/google/url");
-      const { url } = await res.json();
-      
-      window.open(
-        url,
-        'google_oauth',
-        'width=600,height=700'
-      );
-    } catch (err) {
-      setError("Error al iniciar Google Auth");
+      await loginWithGoogle();
+      onClose();
+    } catch (err: any) {
+      console.error("Google login error:", err);
+      setError("Error al iniciar sesión con Google");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -214,17 +202,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               </div>
 
               {/* Social Auth */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <button 
                   onClick={handleGoogleAuth}
-                  className="flex items-center justify-center gap-2 py-3 bg-brand-bg border border-white/5 rounded-xl text-sm font-medium text-neutral-300 hover:bg-white/5 transition-all"
+                  disabled={loading}
+                  className="flex items-center justify-center gap-2 py-3 bg-brand-bg border border-white/5 rounded-xl text-sm font-medium text-neutral-300 hover:bg-white/5 transition-all disabled:opacity-50"
                 >
                   <Chrome className="w-4 h-4" />
                   Google
-                </button>
-                <button className="flex items-center justify-center gap-2 py-3 bg-brand-bg border border-white/5 rounded-xl text-sm font-medium text-neutral-300 hover:bg-white/5 transition-all">
-                  <Github className="w-4 h-4" />
-                  GitHub
                 </button>
               </div>
             </div>

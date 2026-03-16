@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download } from "lucide-react";
 import { Helmet } from "react-helmet-async";
+import { useUser } from "../contexts/UserContext";
 
 const config = {
   iceServers: [
@@ -13,7 +14,7 @@ const config = {
 };
 
 export default function Broadcast() {
-  const [user, setUser] = useState<any>(null);
+  const { user, loading: userLoading, logout } = useUser();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
@@ -33,60 +34,60 @@ export default function Broadcast() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("broadcaster_user");
-    if (!storedUser) {
+    if (!userLoading && !user) {
       navigate("/auth");
       return;
     }
-    setUser(JSON.parse(storedUser));
 
-    // Initialize Socket.IO
-    socketRef.current = io();
+    if (user) {
+      // Initialize Socket.IO
+      socketRef.current = io();
 
-    socketRef.current.on("watcher", (id: string) => {
-      const peerConnection = new RTCPeerConnection(config);
-      peerConnections.current[id] = peerConnection;
+      socketRef.current.on("watcher", (id: string) => {
+        const peerConnection = new RTCPeerConnection(config);
+        peerConnections.current[id] = peerConnection;
 
-      if (stream) {
-        stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-      }
-
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          socketRef.current?.emit("candidate", id, event.candidate);
+        if (stream) {
+          stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
         }
-      };
 
-      peerConnection
-        .createOffer()
-        .then(sdp => peerConnection.setLocalDescription(sdp))
-        .then(() => {
-          socketRef.current?.emit("offer", id, peerConnection.localDescription);
-        });
-    });
+        peerConnection.onicecandidate = (event) => {
+          if (event.candidate) {
+            socketRef.current?.emit("candidate", id, event.candidate);
+          }
+        };
 
-    socketRef.current.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
-      peerConnections.current[id].setRemoteDescription(description);
-    });
+        peerConnection
+          .createOffer()
+          .then(sdp => peerConnection.setLocalDescription(sdp))
+          .then(() => {
+            socketRef.current?.emit("offer", id, peerConnection.localDescription);
+          });
+      });
 
-    socketRef.current.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate));
-    });
+      socketRef.current.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
+        peerConnections.current[id].setRemoteDescription(description);
+      });
 
-    socketRef.current.on("disconnectPeer", (id: string) => {
-      if (peerConnections.current[id]) {
-        peerConnections.current[id].close();
-        delete peerConnections.current[id];
-      }
-    });
+      socketRef.current.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate));
+      });
 
-    socketRef.current.on("chat_message", (msg) => {
-      setMessages(prev => [...prev, msg]);
-    });
+      socketRef.current.on("disconnectPeer", (id: string) => {
+        if (peerConnections.current[id]) {
+          peerConnections.current[id].close();
+          delete peerConnections.current[id];
+        }
+      });
 
-    socketRef.current.on("viewers_count", (count: number) => {
-      setViewers(count);
-    });
+      socketRef.current.on("chat_message", (msg) => {
+        setMessages(prev => [...prev, msg]);
+      });
+
+      socketRef.current.on("viewers_count", (count: number) => {
+        setViewers(count);
+      });
+    }
 
     return () => {
       socketRef.current?.disconnect();
@@ -94,7 +95,7 @@ export default function Broadcast() {
       Object.values(peerConnections.current).forEach(pc => pc.close());
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [navigate, stream]);
+  }, [navigate, stream, user, userLoading]);
 
   const startBroadcast = async () => {
     try {
@@ -214,9 +215,9 @@ export default function Broadcast() {
     setNewMessage("");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     stopBroadcast();
-    localStorage.removeItem("broadcaster_user");
+    await logout();
     navigate("/auth");
   };
 
