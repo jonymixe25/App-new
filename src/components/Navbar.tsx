@@ -1,17 +1,18 @@
 import { Link, useLocation } from "react-router-dom";
-import { Mountain, MonitorPlay, Video, Library, Home, Languages, Globe, Users, ShieldCheck } from "lucide-react";
+import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
+import { useUser } from "../contexts/UserContext";
 
 export default function Navbar() {
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
+  const { user, loading } = useUser();
 
   const navLinks = [
     { path: "/", label: t("nav_home"), icon: Home },
     { path: "/view", label: t("nav_view"), icon: MonitorPlay },
     { path: "/traductor", label: t("nav_translator"), icon: Languages },
     { path: "/team", label: t("team_title"), icon: Users },
-    { path: "/recordings", label: t("nav_recordings"), icon: Library },
     { path: "/admin", label: "Admin", icon: ShieldCheck, isAdmin: true },
   ];
 
@@ -66,28 +67,55 @@ export default function Navbar() {
               <Globe className="w-4 h-4" />
               {t("lang_toggle")}
             </button>
+
+            {/* User Profile / Login */}
+            <div className="ml-2 pl-4 border-l border-white/10">
+              {!loading && (
+                user ? (
+                  <Link to="/admin" className="flex items-center gap-2 group">
+                    <div className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50 group-hover:border-brand-primary transition-all">
+                      {user.photoUrl ? (
+                        <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-full h-full bg-brand-primary/20 flex items-center justify-center text-brand-primary">
+                          <User className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-neutral-300 group-hover:text-white transition-colors hidden lg:block">
+                      {user.name.split(' ')[0]}
+                    </span>
+                  </Link>
+                ) : (
+                  <Link 
+                    to="/auth" 
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-all"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    Acceder
+                  </Link>
+                )
+              )}
+            </div>
           </div>
 
           {/* Mobile Navigation (Simple Icons) */}
           <div className="flex md:hidden items-center gap-2">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              const isActive = location.pathname === link.path;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`p-2 rounded-full transition-all ${
-                    isActive
-                      ? "bg-brand-primary text-white"
-                      : "text-neutral-400 hover:text-white hover:bg-white/5"
-                  }`}
-                  title={link.label}
-                >
-                  <Icon className="w-5 h-5" />
-                </Link>
-              );
-            })}
+            {user ? (
+              <Link to="/admin" className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50">
+                {user.photoUrl ? (
+                  <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-full h-full bg-brand-primary/20 flex items-center justify-center text-brand-primary">
+                    <User className="w-4 h-4" />
+                  </div>
+                )}
+              </Link>
+            ) : (
+              <Link to="/auth" className="p-2 text-neutral-400 hover:text-white">
+                <LogIn className="w-5 h-5" />
+              </Link>
+            )}
             <button
               onClick={toggleLanguage}
               className="p-2 rounded-full bg-brand-secondary/20 text-brand-secondary"
