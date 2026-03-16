@@ -36,61 +36,82 @@ export default function Broadcast() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Initialize Socket.IO
-    socketRef.current = io();
+    // Initialize Socket.IO once
+    const socket = io();
+    socketRef.current = socket;
 
-    socketRef.current.on("watcher", (id: string) => {
-        const peerConnection = new RTCPeerConnection(config);
-        peerConnections.current[id] = peerConnection;
+    socket.on("watcher", (id: string) => {
+      const peerConnection = new RTCPeerConnection(config);
+      peerConnections.current[id] = peerConnection;
 
-        if (stream) {
-          stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+      // Add tracks from current stream if it exists
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          peerConnection.addTrack(track, streamRef.current!);
+        });
+      }
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("candidate", id, event.candidate);
         }
+      };
 
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate) {
-            socketRef.current?.emit("candidate", id, event.candidate);
-          }
-        };
+      peerConnection
+        .createOffer()
+        .then(sdp => peerConnection.setLocalDescription(sdp))
+        .then(() => {
+          socket.emit("offer", id, peerConnection.localDescription);
+        })
+        .catch(err => console.error("Error creating offer:", err));
+    });
 
-        peerConnection
-          .createOffer()
-          .then(sdp => peerConnection.setLocalDescription(sdp))
-          .then(() => {
-            socketRef.current?.emit("offer", id, peerConnection.localDescription);
-          });
-      });
+    socket.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].setRemoteDescription(description).catch(err => {
+          console.error("Error setting remote description:", err);
+        });
+      }
+    });
 
-      socketRef.current.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
-        peerConnections.current[id].setRemoteDescription(description);
-      });
+    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+          console.error("Error adding ice candidate:", err);
+        });
+      }
+    });
 
-      socketRef.current.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate));
-      });
+    socket.on("disconnectPeer", (id: string) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].close();
+        delete peerConnections.current[id];
+      }
+    });
 
-      socketRef.current.on("disconnectPeer", (id: string) => {
-        if (peerConnections.current[id]) {
-          peerConnections.current[id].close();
-          delete peerConnections.current[id];
-        }
-      });
+    socket.on("chat_message", (msg) => {
+      setMessages(prev => [...prev, msg]);
+    });
 
-      socketRef.current.on("chat_message", (msg) => {
-        setMessages(prev => [...prev, msg]);
-      });
-
-      socketRef.current.on("viewers_count", (count: number) => {
-        setViewers(count);
-      });
+    socket.on("viewers_count", (count: number) => {
+      setViewers(count);
+    });
 
     return () => {
-      socketRef.current?.disconnect();
-      stream?.getTracks().forEach(track => track.stop());
+      socket.disconnect();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
       Object.values(peerConnections.current).forEach(pc => pc.close());
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [navigate, stream, user, userLoading]);
+  }, []); // Only run once on mount
+
+  // Use a ref for the stream to access it inside socket listeners without re-binding
+  const streamRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
 
   const startBroadcast = async () => {
     if (!stream) {
@@ -127,8 +148,7 @@ export default function Broadcast() {
     stream?.getTracks().forEach(track => track.stop());
     setStream(null);
     setIsLive(false);
-    socketRef.current?.disconnect();
-    socketRef.current = io(); // Reconnect for chat/status
+    socketRef.current?.emit("stop_broadcasting");
   };
 
   const toggleMute = () => {

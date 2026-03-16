@@ -73,6 +73,8 @@ async function startServer() {
 
   // Almacenar broadcasters: socket.id -> { id, name, viewers }
   const activeBroadcasters = new Map<string, { id: string, name: string, viewers: number }>();
+  // Almacenar qué está viendo cada socket: watcherId -> broadcasterId
+  const watching = new Map<string, string>();
   const chatHistory: any[] = [];
   // Almacenar usuarios conectados: socket.id -> { username, id }
   const users: { [id: string]: { username: string; id: string } } = {};
@@ -97,9 +99,33 @@ async function startServer() {
       socket.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
     });
 
+    socket.on("stop_broadcasting", () => {
+      if (activeBroadcasters.has(socket.id)) {
+        activeBroadcasters.delete(socket.id);
+        socket.broadcast.emit("disconnectPeer", socket.id);
+        io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
+        
+        // Limpiar watchers que estaban viendo a este broadcaster
+        for (const [watcherId, bId] of watching.entries()) {
+          if (bId === socket.id) {
+            watching.delete(watcherId);
+          }
+        }
+      }
+    });
+
     socket.on("watcher", (broadcasterId: string) => {
       const b = activeBroadcasters.get(broadcasterId);
       if (b) {
+        // Si ya estaba viendo a alguien, quitarlo de esa cuenta
+        const previousBroadcasterId = watching.get(socket.id);
+        if (previousBroadcasterId && activeBroadcasters.has(previousBroadcasterId)) {
+          const prevB = activeBroadcasters.get(previousBroadcasterId)!;
+          prevB.viewers = Math.max(0, prevB.viewers - 1);
+          io.to(previousBroadcasterId).emit("viewers_count", prevB.viewers);
+        }
+
+        watching.set(socket.id, broadcasterId);
         socket.to(broadcasterId).emit("watcher", socket.id);
         b.viewers++;
         io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
@@ -166,17 +192,31 @@ async function startServer() {
         emitUserList();
       }
 
+      // Si era un broadcaster
       if (activeBroadcasters.has(socket.id)) {
         activeBroadcasters.delete(socket.id);
         socket.broadcast.emit("disconnectPeer", socket.id);
         io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
-      } else {
-        // Reducir viewers de todos los broadcasters donde este socket estaba mirando
-        activeBroadcasters.forEach(b => {
-          socket.to(b.id).emit("disconnectPeer", socket.id);
-          // Opcional: decrementar viewers si sabemos que estaba mirando
-          // Por simplicidad, el cliente debería avisar al salir de una sala
-        });
+        
+        // Limpiar watchers que estaban viendo a este broadcaster
+        for (const [watcherId, bId] of watching.entries()) {
+          if (bId === socket.id) {
+            watching.delete(watcherId);
+          }
+        }
+      } 
+      
+      // Si era un watcher
+      const broadcasterId = watching.get(socket.id);
+      if (broadcasterId) {
+        watching.delete(socket.id);
+        const b = activeBroadcasters.get(broadcasterId);
+        if (b) {
+          b.viewers = Math.max(0, b.viewers - 1);
+          socket.to(broadcasterId).emit("disconnectPeer", socket.id);
+          socket.to(broadcasterId).emit("viewers_count", b.viewers);
+          io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
+        }
       }
     });
   });

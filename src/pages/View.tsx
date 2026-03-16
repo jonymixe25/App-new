@@ -28,54 +28,74 @@ export default function View() {
   const peerConnection = useRef<RTCPeerConnection | null>(null);
 
   useEffect(() => {
-    socketRef.current = io();
+    const socket = io();
+    socketRef.current = socket;
 
-    socketRef.current.on("broadcaster_list", (list: any[]) => {
+    socket.on("broadcaster_list", (list: any[]) => {
       setBroadcasters(list);
     });
 
-    socketRef.current.emit("get_broadcasters");
+    socket.emit("get_broadcasters");
 
-    socketRef.current.on("offer", (id: string, description: RTCSessionDescriptionInit) => {
-      peerConnection.current = new RTCPeerConnection(config);
+    socket.on("offer", (id: string, description: RTCSessionDescriptionInit) => {
+      // Close existing connection if any
+      if (peerConnection.current) {
+        peerConnection.current.close();
+      }
+
+      const pc = new RTCPeerConnection(config);
+      peerConnection.current = pc;
       
-      peerConnection.current.onicecandidate = (event) => {
+      pc.onicecandidate = (event) => {
         if (event.candidate) {
-          socketRef.current?.emit("candidate", id, event.candidate);
+          socket.emit("candidate", id, event.candidate);
         }
       };
 
-      peerConnection.current.ontrack = (event) => {
+      pc.ontrack = (event) => {
         if (videoRef.current) {
           videoRef.current.srcObject = event.streams[0];
         }
       };
 
-      peerConnection.current
-        .setRemoteDescription(description)
-        .then(() => peerConnection.current?.createAnswer())
-        .then(sdp => peerConnection.current?.setLocalDescription(sdp))
+      pc.setRemoteDescription(description)
+        .then(() => pc.createAnswer())
+        .then(sdp => pc.setLocalDescription(sdp))
         .then(() => {
-          socketRef.current?.emit("answer", id, peerConnection.current?.localDescription);
+          socket.emit("answer", id, pc.localDescription);
+        })
+        .catch(err => console.error("Error handling offer:", err));
+    });
+
+    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+      if (peerConnection.current) {
+        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+          console.error("Error adding ice candidate:", err);
         });
+      }
     });
 
-    socketRef.current.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-
-    socketRef.current.on("chat_message", (msg) => {
+    socket.on("chat_message", (msg) => {
       setMessages(prev => [...prev, msg]);
     });
 
-    socketRef.current.on("disconnectPeer", () => {
+    socket.on("viewers_count", (count: number) => {
+      setViewers(count);
+    });
+
+    socket.on("disconnectPeer", () => {
       if (videoRef.current) videoRef.current.srcObject = null;
-      peerConnection.current?.close();
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
     });
 
     return () => {
-      socketRef.current?.disconnect();
-      peerConnection.current?.close();
+      socket.disconnect();
+      if (peerConnection.current) {
+        peerConnection.current.close();
+      }
     };
   }, []);
 
