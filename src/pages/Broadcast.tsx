@@ -23,6 +23,7 @@ export default function Broadcast() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLive, setIsLive] = useState(false);
+  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   
@@ -92,6 +93,16 @@ export default function Broadcast() {
   }, [navigate, stream, user, userLoading]);
 
   const startBroadcast = async () => {
+    if (!stream) {
+      const success = await requestPermissions();
+      if (!success) return;
+    }
+    
+    socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
+    setIsLive(true);
+  };
+
+  const requestPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { width: 1280, height: 720 },
@@ -99,15 +110,15 @@ export default function Broadcast() {
       });
       
       setStream(mediaStream);
+      setHasPermissions(true);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      
-      socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
-      setIsLive(true);
+      return true;
     } catch (err) {
       console.error("Error accessing media devices:", err);
-      alert("No se pudo acceder a la cámara o micrófono.");
+      setHasPermissions(false);
+      return false;
     }
   };
 
@@ -227,22 +238,53 @@ export default function Broadcast() {
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-white">¡Listo para transmitir!</h1>
-            <p className="text-neutral-400">Ingresa el nombre de tu programa o canal para comenzar.</p>
+            <p className="text-neutral-400">Para comenzar, necesitamos acceso a tu cámara y micrófono.</p>
           </div>
+
+          {hasPermissions === false && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm">
+              No se pudo acceder a la cámara o micrófono. Por favor, verifica los permisos de tu navegador.
+            </div>
+          )}
+
           <div className="space-y-4">
-            <input
-              type="text"
-              value={streamName}
-              onChange={(e) => setStreamName(e.target.value)}
-              placeholder="Nombre de la transmisión"
-              className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
-            />
-            <button 
-              onClick={startBroadcast}
-              className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
-            >
-              Comenzar ahora
-            </button>
+            {!stream ? (
+              <button 
+                onClick={requestPermissions}
+                className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3"
+              >
+                <Video className="w-5 h-5" />
+                Habilitar Cámara y Micrófono
+              </button>
+            ) : (
+              <div className="space-y-4">
+                <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-white/10">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-brand-primary/80 text-white text-[10px] font-bold uppercase rounded-full">
+                    Vista Previa
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={streamName}
+                  onChange={(e) => setStreamName(e.target.value)}
+                  placeholder="Nombre de la transmisión"
+                  className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
+                />
+                <button 
+                  onClick={startBroadcast}
+                  className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
+                >
+                  Comenzar ahora
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
