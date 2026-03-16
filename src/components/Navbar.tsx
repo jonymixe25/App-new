@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Mountain, MonitorPlay, Video, Library, Home, Languages, Globe, Users } from "lucide-react";
+import { Mountain, MonitorPlay, Video, Library, Home, Languages, Globe, Users, ShieldCheck } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
 export default function Navbar() {
@@ -12,6 +12,7 @@ export default function Navbar() {
     { path: "/traductor", label: t("nav_translator"), icon: Languages },
     { path: "/team", label: t("team_title"), icon: Users },
     { path: "/recordings", label: t("nav_recordings"), icon: Library },
+    { path: "/admin", label: "Admin", icon: ShieldCheck, isAdmin: true },
   ];
 
   const toggleLanguage = () => {
@@ -45,7 +46,9 @@ export default function Navbar() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       isActive
                         ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20"
-                        : "text-neutral-400 hover:text-white hover:bg-white/5"
+                        : link.isAdmin 
+                          ? "text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20"
+                          : "text-neutral-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     <Icon className="w-4 h-4" />

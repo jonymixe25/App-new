@@ -229,10 +229,18 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-20 text-center border-t border-white/5 pt-12">
+        <div className="mt-20 text-center border-t border-white/5 pt-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <p className="text-neutral-500 text-sm">
             © {new Date().getFullYear()} Vida Mixe TV. {t("footer_made_with")}
           </p>
+          <div className="flex items-center gap-6">
+            <Link to="/auth" className="text-xs font-bold text-neutral-600 hover:text-brand-primary uppercase tracking-widest transition-colors">
+              Portal de Locutores
+            </Link>
+            <Link to="/admin-news" className="text-xs font-bold text-neutral-600 hover:text-brand-primary uppercase tracking-widest transition-colors">
+              Gestión de Noticias
+            </Link>
+          </div>
         </div>
       </div>
     </div>
