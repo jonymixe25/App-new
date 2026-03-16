@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Mountain, MonitorPlay, Video, Library, Home, Languages, Globe } from "lucide-react";
+import { Mountain, MonitorPlay, Video, Library, Home, Languages, Globe, Users } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
 export default function Navbar() {
@@ -10,6 +10,7 @@ export default function Navbar() {
     { path: "/", label: t("nav_home"), icon: Home },
     { path: "/view", label: t("nav_view"), icon: MonitorPlay },
     { path: "/traductor", label: t("nav_translator"), icon: Languages },
+    { path: "/team", label: t("team_title"), icon: Users },
     { path: "/recordings", label: t("nav_recordings"), icon: Library },
   ];
 

@@ -1,5 +1,5 @@
 {
   "name": "Vida Mixe TV & Traductor",
-  "description": "Plataforma de transmisión y traductor inteligente para la comunidad Mixe (Ayuuk). Conectando tradiciones, música y lengua de la Sierra Norte de Oaxaca con el mundo.",
+  "description": "Plataforma bilingüe para la comunidad Mixe (Ayuuk). Incluye transmisión en vivo, noticias y traductor inteligente.",
   "requestFramePermissions": ["camera", "microphone"]
 }

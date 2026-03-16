@@ -3,6 +3,7 @@ import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper
 import { Helmet } from "react-helmet-async";
 import { useEffect, useState } from "react";
 import LivePreview from "../components/LivePreview";
+import CulturalCalendar from "../components/CulturalCalendar";
 import { useLanguage } from "../context/LanguageContext";
 
 interface NewsItem {
@@ -145,26 +146,34 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {news.length > 0 ? (
-              news.map((item) => (
-                <div key={item.id} className="bg-brand-surface border border-white/5 rounded-2xl p-8 hover:border-brand-primary/30 transition-all group">
-                  <div className="text-xs text-neutral-500 mb-4 flex items-center gap-2">
-                    <span>{new Date(item.date).toLocaleDateString()}</span>
-                    <span>•</span>
-                    <span>Por {item.author}</span>
+          <div className="grid lg:grid-cols-3 gap-12">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="grid md:grid-cols-2 gap-8">
+                {news.length > 0 ? (
+                  news.map((item) => (
+                    <div key={item.id} className="bg-brand-surface border border-white/5 rounded-2xl p-8 hover:border-brand-primary/30 transition-all group">
+                      <div className="text-xs text-neutral-500 mb-4 flex items-center gap-2">
+                        <span>{new Date(item.date).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>Por {item.author}</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-white mb-4 group-hover:text-brand-primary transition-colors">{item.title}</h3>
+                      <p className="text-neutral-400 text-sm leading-relaxed line-clamp-3">
+                        {item.content}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-12 text-neutral-500">
+                    {t("news_empty")}
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-4 group-hover:text-brand-primary transition-colors">{item.title}</h3>
-                  <p className="text-neutral-400 text-sm leading-relaxed line-clamp-3">
-                    {item.content}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12 text-neutral-500">
-                {t("news_empty")}
+                )}
               </div>
-            )}
+            </div>
+            
+            <div className="lg:col-span-1">
+              <CulturalCalendar />
+            </div>
           </div>
         </div>
       </div>

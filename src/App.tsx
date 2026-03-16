@@ -6,6 +6,8 @@ import View from "./pages/View";
 import Recordings from "./pages/Recordings";
 import AdminNews from "./pages/AdminNews";
 import Translator from "./pages/Translator";
+import Team from "./pages/Team";
+import Auth from "./pages/Auth";
 import Navbar from "./components/Navbar";
 
 export default function App() {
@@ -23,6 +25,8 @@ export default function App() {
               <Route path="/recordings" element={<Recordings />} />
               <Route path="/admin-news" element={<AdminNews />} />
               <Route path="/traductor" element={<Translator />} />
+              <Route path="/team" element={<Team />} />
+              <Route path="/auth" element={<Auth />} />
             </Routes>
           </main>
         </div>
