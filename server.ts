@@ -54,13 +54,7 @@ if (newsCount.count === 0) {
   );
 }
 
-const adminCount = db.prepare("SELECT COUNT(*) as count FROM broadcasters").get() as { count: number };
-if (adminCount.count === 0) {
-  db.prepare(`
-    INSERT INTO broadcasters (id, username, password, name)
-    VALUES (?, ?, ?, ?)
-  `).run("1", "admin", "password123", "Administrador");
-}
+  // No initial admin seeding needed
 
 async function startServer() {
   const app = express();
@@ -250,7 +244,7 @@ async function startServer() {
   });
 
   // Catch-all for API routes to prevent falling through to Vite
-  app.all("/api/*", (req, res) => {
+  app.all("/api/*all", (req, res) => {
     console.log(`404 API: ${req.method} ${req.url}`);
     res.status(404).json({ error: `Ruta de API no encontrada: ${req.url}` });
   });
@@ -265,7 +259,7 @@ async function startServer() {
   } else {
     const distPath = path.resolve(__dirname, "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.get("*all", (req, res) => {
       res.sendFile(path.resolve(distPath, "index.html"));
     });
   }

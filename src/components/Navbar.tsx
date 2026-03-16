@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User } from "lucide-react";
+import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User, Video } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { useUser } from "../contexts/UserContext";
 
@@ -11,9 +11,9 @@ export default function Navbar() {
   const navLinks = [
     { path: "/", label: t("nav_home"), icon: Home },
     { path: "/view", label: t("nav_view"), icon: MonitorPlay },
+    { path: "/transmitir", label: "Transmitir", icon: Video },
     { path: "/traductor", label: t("nav_translator"), icon: Languages },
     { path: "/team", label: t("team_title"), icon: Users },
-    { path: "/admin", label: "Admin", icon: ShieldCheck, isAdmin: true },
   ];
 
   const toggleLanguage = () => {
@@ -47,9 +47,7 @@ export default function Navbar() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                       isActive
                         ? "bg-brand-primary text-white shadow-lg shadow-brand-primary/20"
-                        : link.isAdmin 
-                          ? "text-brand-primary hover:bg-brand-primary/10 border border-brand-primary/20"
-                          : "text-neutral-400 hover:text-white hover:bg-white/5"
+                        : "text-neutral-400 hover:text-white hover:bg-white/5"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -72,7 +70,7 @@ export default function Navbar() {
             <div className="ml-2 pl-4 border-l border-white/10">
               {!loading && (
                 user ? (
-                  <Link to="/admin" className="flex items-center gap-2 group">
+                  <Link to="/transmitir" className="flex items-center gap-2 group">
                     <div className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50 group-hover:border-brand-primary transition-all">
                       {user.photoUrl ? (
                         <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -102,7 +100,7 @@ export default function Navbar() {
           {/* Mobile Navigation (Simple Icons) */}
           <div className="flex md:hidden items-center gap-2">
             {user ? (
-              <Link to="/admin" className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50">
+              <Link to="/transmitir" className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50">
                 {user.photoUrl ? (
                   <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (

@@ -141,8 +141,8 @@ export default function Home() {
               </div>
               <h2 className="text-4xl font-bold text-white">{t("news_title")}</h2>
             </div>
-            <Link to="/admin-news" className="text-neutral-500 hover:text-white text-sm transition-colors">
-              Acceso Admin
+            <Link to="/transmitir" className="text-neutral-500 hover:text-white text-sm transition-colors">
+              Transmitir ahora
             </Link>
           </div>
 
@@ -234,11 +234,8 @@ export default function Home() {
             © {new Date().getFullYear()} Vida Mixe TV. {t("footer_made_with")}
           </p>
           <div className="flex items-center gap-6">
-            <Link to="/auth" className="text-xs font-bold text-neutral-600 hover:text-brand-primary uppercase tracking-widest transition-colors">
-              Portal de Locutores
-            </Link>
-            <Link to="/admin-news" className="text-xs font-bold text-neutral-600 hover:text-brand-primary uppercase tracking-widest transition-colors">
-              Gestión de Noticias
+            <Link to="/transmitir" className="text-xs font-bold text-neutral-600 hover:text-brand-primary uppercase tracking-widest transition-colors">
+              Transmitir en Vivo
             </Link>
           </div>
         </div>

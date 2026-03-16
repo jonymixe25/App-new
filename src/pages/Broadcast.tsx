@@ -16,6 +16,7 @@ const config = {
 export default function Broadcast() {
   const { user, loading: userLoading, logout } = useUser();
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [streamName, setStreamName] = useState("");
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [viewers, setViewers] = useState(0);
@@ -34,16 +35,10 @@ export default function Broadcast() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!userLoading && !user) {
-      navigate("/auth");
-      return;
-    }
+    // Initialize Socket.IO
+    socketRef.current = io();
 
-    if (user) {
-      // Initialize Socket.IO
-      socketRef.current = io();
-
-      socketRef.current.on("watcher", (id: string) => {
+    socketRef.current.on("watcher", (id: string) => {
         const peerConnection = new RTCPeerConnection(config);
         peerConnections.current[id] = peerConnection;
 
@@ -87,7 +82,6 @@ export default function Broadcast() {
       socketRef.current.on("viewers_count", (count: number) => {
         setViewers(count);
       });
-    }
 
     return () => {
       socketRef.current?.disconnect();
@@ -109,7 +103,7 @@ export default function Broadcast() {
         videoRef.current.srcObject = mediaStream;
       }
       
-      socketRef.current?.emit("broadcaster", user?.name || "Vida Mixe Stream");
+      socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
       setIsLive(true);
     } catch (err) {
       console.error("Error accessing media devices:", err);
@@ -205,7 +199,7 @@ export default function Broadcast() {
 
     const msg = {
       id: Date.now().toString(),
-      user: user?.name || "Admin",
+      user: user?.name || streamName || "Locutor",
       text: newMessage,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isAdmin: true
@@ -220,6 +214,40 @@ export default function Broadcast() {
     await logout();
     navigate("/auth");
   };
+
+  if (!isLive && !stream) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-6">
+        <Helmet>
+          <title>Iniciar Transmisión | Vida Mixe TV</title>
+        </Helmet>
+        <div className="w-full max-w-md bg-brand-surface border border-white/10 rounded-[2.5rem] p-10 shadow-2xl text-center space-y-8">
+          <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-3xl flex items-center justify-center mx-auto">
+            <Video className="w-10 h-10" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-white">¡Listo para transmitir!</h1>
+            <p className="text-neutral-400">Ingresa el nombre de tu programa o canal para comenzar.</p>
+          </div>
+          <div className="space-y-4">
+            <input
+              type="text"
+              value={streamName}
+              onChange={(e) => setStreamName(e.target.value)}
+              placeholder="Nombre de la transmisión"
+              className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
+            />
+            <button 
+              onClick={startBroadcast}
+              className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
+            >
+              Comenzar ahora
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col">
@@ -341,21 +369,31 @@ export default function Broadcast() {
                 <ShieldCheck className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="font-bold text-white">Panel Admin</h2>
-                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">{user?.name}</p>
+                <h2 className="font-bold text-white">Panel de Transmisión</h2>
+                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">{user?.name || streamName || "Invitado"}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <button className="p-2 text-neutral-500 hover:text-white transition-colors">
                 <Settings className="w-5 h-5" />
               </button>
-              <button 
-                onClick={handleLogout}
-                className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                title="Cerrar Sesión"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
+              {user ? (
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                  title="Cerrar Sesión"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              ) : (
+                <button 
+                  onClick={() => { stopBroadcast(); navigate("/"); }}
+                  className="p-2 text-neutral-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  title="Salir"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
 
