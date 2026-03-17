@@ -38,12 +38,10 @@ export default function Broadcast() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!userLoading && !user) {
-      navigate("/auth");
-    } else if (user && !streamRef.current) {
+    if (user && !streamRef.current) {
       requestPermissions();
     }
-  }, [user, userLoading]);
+  }, [user]);
 
   useEffect(() => {
     // Initialize Socket.IO once

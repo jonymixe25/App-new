@@ -11,6 +11,7 @@ import Team from "./pages/Team";
 import Auth from "./pages/Auth";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
@@ -22,11 +23,19 @@ export default function App() {
             <main className="flex-1">
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/transmitir" element={<Broadcast />} />
+                <Route path="/transmitir" element={
+                  <ProtectedRoute>
+                    <Broadcast />
+                  </ProtectedRoute>
+                } />
                 <Route path="/view" element={<View />} />
                 <Route path="/vista" element={<View />} />
                 <Route path="/recordings" element={<Recordings />} />
-                <Route path="/admin-news" element={<AdminNews />} />
+                <Route path="/admin-news" element={
+                  <ProtectedRoute>
+                    <AdminNews />
+                  </ProtectedRoute>
+                } />
                 <Route path="/traductor" element={<Translator />} />
                 <Route path="/team" element={<Team />} />
                 <Route path="/auth" element={<Auth />} />

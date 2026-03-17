@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { User as UserIcon, Lock, ArrowRight, UserPlus, LogIn, ArrowLeft } from "lucide-react";
 import { loginWithGoogle } from "../firebase";
@@ -13,14 +13,17 @@ export default function Auth() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useUser();
+
+  const from = (location.state as any)?.from?.pathname || "/transmitir";
 
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError(null);
     try {
       await loginWithGoogle();
-      navigate("/admin");
+      navigate(from, { replace: true });
     } catch (err: any) {
       console.error("Google login error:", err);
       setError("Error al iniciar sesión con Google. Inténtalo de nuevo.");
@@ -59,7 +62,7 @@ export default function Auth() {
 
       const data = await res.json();
       login(data.user);
-      navigate("/admin");
+      navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message);
     } finally {

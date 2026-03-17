@@ -1,12 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User, Video } from "lucide-react";
+import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User, Video, LogOut } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { useUser } from "../contexts/UserContext";
 
 export default function Navbar() {
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
-  const { user, loading } = useUser();
+  const { user, loading, logout } = useUser();
 
   const navLinks = [
     { path: "/", label: t("nav_home"), icon: Home },
@@ -67,23 +67,32 @@ export default function Navbar() {
             </button>
 
             {/* User Profile / Login */}
-            <div className="ml-2 pl-4 border-l border-white/10">
+            <div className="ml-2 pl-4 border-l border-white/10 flex items-center gap-4">
               {!loading && (
                 user ? (
-                  <Link to="/transmitir" className="flex items-center gap-2 group">
-                    <div className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50 group-hover:border-brand-primary transition-all">
-                      {user.photoUrl ? (
-                        <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <div className="w-full h-full bg-brand-primary/20 flex items-center justify-center text-brand-primary">
-                          <User className="w-4 h-4" />
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs font-medium text-neutral-300 group-hover:text-white transition-colors hidden lg:block">
-                      {user.name.split(' ')[0]}
-                    </span>
-                  </Link>
+                  <>
+                    <Link to="/transmitir" className="flex items-center gap-2 group">
+                      <div className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50 group-hover:border-brand-primary transition-all">
+                        {user.photoUrl ? (
+                          <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full bg-brand-primary/20 flex items-center justify-center text-brand-primary">
+                            <User className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-neutral-300 group-hover:text-white transition-colors hidden lg:block">
+                        {user.name.split(' ')[0]}
+                      </span>
+                    </Link>
+                    <button 
+                      onClick={() => logout()}
+                      className="p-2 text-neutral-500 hover:text-red-400 transition-colors"
+                      title="Cerrar Sesión"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </>
                 ) : (
                   <Link 
                     to="/auth" 
