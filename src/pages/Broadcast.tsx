@@ -1,287 +1,77 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import { Video, VideoOff, Mic, MicOff, AlertCircle, Users, Clock, MessageSquare, Share2, Check, Loader2, Phone, X, Circle, Square, Save, RefreshCw, Camera } from "lucide-react";
+import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download } from "lucide-react";
 import { Helmet } from "react-helmet-async";
-import Chat from "../components/Chat";
-import { Link } from "react-router-dom";
-import { saveRecording } from "../utils/videoStorage";
-import { getSocketUrl } from "../utils/socket";
+import { useUser } from "../contexts/UserContext";
 
 const config = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:global.stun.twilio.com:3478" }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:stun2.l.google.com:19302"] },
+    { urls: ["stun:stun3.l.google.com:19302"] },
+    { urls: ["stun:stun4.l.google.com:19302"] }
   ]
 };
 
-interface User {
-  id: string;
-  username: string;
-}
-
 export default function Broadcast() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const privateVideoRef = useRef<HTMLVideoElement>(null); // Video para la llamada privada
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const { user, loading: userLoading, logout } = useUser();
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
-  const pendingCandidates = useRef<{ [id: string]: RTCIceCandidateInit[] }>({});
-  
-  // Private Call Refs
-  const privatePeerConnection = useRef<RTCPeerConnection | null>(null);
-  const [privateCallUser, setPrivateCallUser] = useState<User | null>(null);
-  const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
-  
-  // Recording State
+  const [streamName, setStreamName] = useState("");
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [viewers, setViewers] = useState(0);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [isLive, setIsLive] = useState(false);
+  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [viewers, setViewers] = useState(0);
-  const [connectedUsers, setConnectedUsers] = useState<User[]>([]);
-  const [uptime, setUptime] = useState(0);
-  const [showChat, setShowChat] = useState(true);
-  const [showUserList, setShowUserList] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [unreadMessages, setUnreadMessages] = useState(0);
   
-  const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [socketError, setSocketError] = useState<string | null>(null);
-  const [streamName, setStreamName] = useState("");
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-
-  // Sound ref
-  const notificationSound = useRef<HTMLAudioElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    notificationSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3");
-    notificationSound.current.volume = 0.5;
+    if (!streamRef.current) {
+      requestPermissions();
+    }
   }, []);
 
-  const playNotification = () => {
-    if (notificationSound.current) {
-      notificationSound.current.currentTime = 0;
-      notificationSound.current.play().catch(e => console.log("Audio play failed", e));
-    }
-  };
-
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-
-  const handleShare = async () => {
-    const currentOrigin = window.location.origin;
-    const sharedOrigin = currentOrigin.replace('ais-dev', 'ais-pre');
-    const viewerUrl = `${sharedOrigin}/view`;
-    
-    try {
-      await navigator.clipboard.writeText(viewerUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy URL", err);
-    }
-  };
-
-  // Private Call Functions
-  const startPrivateCall = async (user: User) => {
-    if (!stream || !socket) return;
-    
-    setPrivateCallUser(user);
-    setIsPrivateCallActive(true);
-    setShowUserList(false);
-
-    const pc = new RTCPeerConnection(config);
-    privatePeerConnection.current = pc;
-
-    // Add local tracks to private connection
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-    });
-
-    // Handle remote stream
-    pc.ontrack = (event) => {
-      if (privateVideoRef.current) {
-        privateVideoRef.current.srcObject = event.streams[0];
-      }
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("private_candidate", user.id, event.candidate);
-      }
-    };
-
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      socket.emit("private_offer", user.id, pc.localDescription);
-    } catch (err) {
-      console.error("Error creating private offer:", err);
-      endPrivateCall();
-    }
-  };
-
-  const endPrivateCall = () => {
-    if (privatePeerConnection.current) {
-      privatePeerConnection.current.close();
-      privatePeerConnection.current = null;
-    }
-    setPrivateCallUser(null);
-    setIsPrivateCallActive(false);
-    if (privateVideoRef.current) {
-      privateVideoRef.current.srcObject = null;
-    }
-  };
-
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isStreaming) {
-      interval = setInterval(() => {
-        setUptime(prev => prev + 1);
-      }, 1000);
-    } else {
-      setUptime(0);
-    }
-    return () => clearInterval(interval);
-  }, [isStreaming]);
+    // Initialize Socket.IO once
+    const socket = io();
+    socketRef.current = socket;
 
-  const formatUptime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // Recording Logic
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isRecording) {
-      interval = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } else {
-      setRecordingTime(0);
-    }
-    return () => clearInterval(interval);
-  }, [isRecording]);
-
-  const startRecording = () => {
-    if (!stream) return;
-    
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9'
-    });
-    
-    mediaRecorderRef.current = mediaRecorder;
-    chunksRef.current = [];
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        chunksRef.current.push(event.data);
-      }
-    };
-
-    mediaRecorder.onstop = async () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      await saveRecording(blob, recordingTime);
-      alert("Grabación guardada con éxito. Puedes verla en la página de Grabaciones.");
-    };
-
-    mediaRecorder.start();
-    setIsRecording(true);
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  };
-
-  useEffect(() => {
-    const socketUrl = getSocketUrl();
-    
-    const s = io(socketUrl, {
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      timeout: 20000,
-    });
-    setSocket(s);
-
-    s.on("connect", () => {
-      setIsSocketConnected(true);
-      setSocketError(null);
-      if (isStreaming) {
-        s.emit("broadcaster", streamName || "Transmisión en vivo");
-      }
-    });
-
-    s.on("connect_error", (err) => {
-      setIsSocketConnected(false);
-      setSocketError(`Error al conectar con ${socketUrl}: ${err.message}`);
-      console.error("Socket connection error:", err);
-    });
-
-    s.on("disconnect", () => {
-      setIsSocketConnected(false);
-    });
-
-    s.on("viewers_count", (count: number) => {
-      setViewers(count);
-    });
-
-    s.on("user_list", (users: User[]) => {
-      setConnectedUsers(users);
-    });
-
-    // Private Call Signaling
-    s.on("private_answer", async (id: string, description: RTCSessionDescriptionInit) => {
-      if (privatePeerConnection.current) {
-        try {
-          await privatePeerConnection.current.setRemoteDescription(description);
-        } catch (err) {
-          console.error("Error setting private remote description:", err);
-        }
-      }
-    });
-
-    s.on("private_candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      if (privatePeerConnection.current) {
-        privatePeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-      }
-    });
-
-    s.on("chat_message", (message: any) => {
-      if (!showChat) {
-        setUnreadMessages(prev => prev + 1);
-        playNotification();
-      }
-    });
-
-    s.on("watcher", (id: string) => {
-      if (!stream) return;
-      
+    socket.on("watcher", (id: string) => {
       const peerConnection = new RTCPeerConnection(config);
       peerConnections.current[id] = peerConnection;
 
-      stream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, stream);
-      });
+      // Add tracks from current stream if it exists
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          peerConnection.addTrack(track, streamRef.current!);
+        });
+      }
 
-      peerConnection.onicecandidate = event => {
+      peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          s.emit("candidate", id, event.candidate);
+          socket.emit("candidate", id, event.candidate);
+        }
+      };
+
+      peerConnection.onnegotiationneeded = async () => {
+        try {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          socket.emit("offer", id, peerConnection.localDescription);
+        } catch (err) {
+          console.error("Negotiation error:", err);
         }
       };
 
@@ -289,103 +79,110 @@ export default function Broadcast() {
         .createOffer()
         .then(sdp => peerConnection.setLocalDescription(sdp))
         .then(() => {
-          s.emit("offer", id, peerConnection.localDescription);
-        });
+          socket.emit("offer", id, peerConnection.localDescription);
+        })
+        .catch(err => console.error("Error creating offer:", err));
     });
 
-    s.on("answer", async (id: string, description: RTCSessionDescriptionInit) => {
-      const pc = peerConnections.current[id];
-      if (pc) {
-        try {
-          await pc.setRemoteDescription(description);
-          const candidates = pendingCandidates.current[id] || [];
-          for (const candidate of candidates) {
-            pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-          }
-          pendingCandidates.current[id] = [];
-        } catch (err) {
+    socket.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].setRemoteDescription(description).catch(err => {
           console.error("Error setting remote description:", err);
-        }
+        });
       }
     });
 
-    s.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      const pc = peerConnections.current[id];
-      if (pc) {
-        if (pc.remoteDescription) {
-          pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-        } else {
-          if (!pendingCandidates.current[id]) pendingCandidates.current[id] = [];
-          pendingCandidates.current[id].push(candidate);
-        }
+    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+          console.error("Error adding ice candidate:", err);
+        });
       }
     });
 
-    s.on("disconnectPeer", (id: string) => {
+    socket.on("disconnectPeer", (id: string) => {
       if (peerConnections.current[id]) {
         peerConnections.current[id].close();
         delete peerConnections.current[id];
       }
-      if (pendingCandidates.current[id]) {
-        delete pendingCandidates.current[id];
-      }
-      // If the private call user disconnected
-      if (privateCallUser && privateCallUser.id === id) {
-        endPrivateCall();
-      }
+    });
+
+    socket.on("chat_message", (msg) => {
+      setMessages(prev => [...prev, msg]);
+    });
+
+    socket.on("viewers_count", (count: number) => {
+      setViewers(count);
     });
 
     return () => {
-      s.disconnect();
-      Object.values<RTCPeerConnection>(peerConnections.current).forEach(pc => pc.close());
-      if (privatePeerConnection.current) privatePeerConnection.current.close();
+      socket.disconnect();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      Object.values(peerConnections.current).forEach(pc => pc.close());
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [stream, isStreaming, privateCallUser]);
+  }, []); // Only run once on mount
 
-  // ... (startStream, stopStream, toggleVideo, toggleAudio remain mostly the same)
-  const startStream = async () => {
+  // Use a ref for the stream to access it inside socket listeners without re-binding
+  const streamRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
+
+  const startBroadcast = async () => {
+    let currentStream = stream;
+    if (!currentStream) {
+      currentStream = await requestPermissions();
+      if (!currentStream) return;
+    }
+    
+    socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
+    setIsLive(true);
+  };
+
+  const requestPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
+        video: { 
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          facingMode: facingMode
+          facingMode: "user"
         },
         audio: true
       });
       
       setStream(mediaStream);
+      streamRef.current = mediaStream;
+      setHasPermissions(true);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      
-      setIsStreaming(true);
-      setError(null);
-      
-      if (socket && isSocketConnected) {
-        socket.emit("broadcaster", streamName || "Transmisión en vivo");
-      }
+      return mediaStream;
     } catch (err) {
-      console.error("Error accessing media devices.", err);
-      setError("No se pudo acceder a la cámara o micrófono. Asegúrate de dar los permisos necesarios.");
+      console.error("Error accessing media devices:", err);
+      setHasPermissions(false);
+      return null;
     }
   };
 
-  const stopStream = () => {
+  const stopBroadcast = () => {
     if (isRecording) stopRecording();
+    stream?.getTracks().forEach(track => track.stop());
+    setStream(null);
+    setIsLive(false);
+    socketRef.current?.emit("stop_broadcasting");
+  };
+
+  const toggleMute = () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMuted(!audioTrack.enabled);
+      }
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setIsStreaming(false);
-    endPrivateCall();
-    
-    // Close all connections
-    Object.values<RTCPeerConnection>(peerConnections.current).forEach(pc => pc.close());
-    peerConnections.current = {};
   };
 
   const toggleVideo = () => {
@@ -393,327 +190,339 @@ export default function Broadcast() {
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
-        setVideoEnabled(videoTrack.enabled);
+        setIsVideoOff(!videoTrack.enabled);
       }
     }
   };
 
-  const toggleAudio = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        setAudioEnabled(audioTrack.enabled);
+  const startRecording = () => {
+    if (!stream) return;
+
+    recordedChunksRef.current = [];
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "video/webm;codecs=vp9,opus"
+    });
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunksRef.current, {
+        type: "video/webm"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vida-mixe-broadcast-${new Date().toISOString()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    mediaRecorder.start();
+    mediaRecorderRef.current = mediaRecorder;
+    setIsRecording(true);
+    setRecordingTime(0);
+    timerRef.current = setInterval(() => {
+      setRecordingTime(prev => prev + 1);
+    }, 1000);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     }
   };
 
-  const flipCamera = async () => {
-    const newFacingMode = facingMode === "user" ? "environment" : "user";
-    setFacingMode(newFacingMode);
-    
-    // If we have an active stream (either preview or live), we need to refresh it
-    if (stream) {
-      try {
-        // Stop current video tracks
-        stream.getVideoTracks().forEach(track => track.stop());
-        
-        const newVideoStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: newFacingMode
-          }
-        });
-        
-        const newVideoTrack = newVideoStream.getVideoTracks()[0];
-        
-        // Update local video element
-        if (videoRef.current) {
-          videoRef.current.srcObject = new MediaStream([newVideoTrack, ...stream.getAudioTracks()]);
-        }
-        
-        // If we are live, replace track in all peer connections
-        if (isStreaming) {
-          (Object.values(peerConnections.current) as RTCPeerConnection[]).forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind === "video");
-            if (sender) {
-              sender.replaceTrack(newVideoTrack);
-            }
-          });
-          
-          // Update private call if active
-          if (privatePeerConnection.current) {
-            const sender = privatePeerConnection.current.getSenders().find(s => s.track?.kind === "video");
-            if (sender) {
-              sender.replaceTrack(newVideoTrack);
-            }
-          }
-        }
-        
-        // Update stream state
-        const combinedStream = new MediaStream([
-          newVideoTrack,
-          ...stream.getAudioTracks()
-        ]);
-        setStream(combinedStream);
-        
-      } catch (err) {
-        console.error("Error flipping camera:", err);
-        setError("No se pudo cambiar la cámara.");
-      }
-    }
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return [h, m, s].map(v => v < 10 ? "0" + v : v).filter((v, i) => v !== "00" || i > 0).join(":");
   };
 
-  // ... (Authentication render logic remains the same)
-  
-  return (
-    <div className="relative w-full h-[calc(100vh-64px)] bg-brand-bg text-neutral-50 overflow-hidden">
-      <Helmet>
-        <title>Transmitir en Vivo | Vida Mixe TV</title>
-        <meta name="description" content="Panel de control para transmisiones en vivo. Comparte tu cultura y tradiciones con el mundo." />
-      </Helmet>
-      <div className="absolute inset-0 bg-black flex items-center justify-center">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="w-full h-full object-contain"
-        />
-        
-        {/* Private Call Overlay */}
-        {isPrivateCallActive && (
-          <div className="absolute bottom-24 right-4 w-64 h-48 bg-brand-surface rounded-xl border border-white/5 shadow-2xl overflow-hidden z-30">
-             <video
-                ref={privateVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-             />
-             <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white flex items-center gap-1">
-               <Phone className="w-3 h-3 text-brand-primary" />
-               {privateCallUser?.username}
-             </div>
-             <button 
-               onClick={endPrivateCall}
-               className="absolute top-2 right-2 p-1 bg-brand-primary/80 hover:bg-brand-primary text-white rounded-full transition-colors"
-             >
-               <X className="w-4 h-4" />
-             </button>
+  const sendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    const msg = {
+      id: Date.now().toString(),
+      user: user?.name || streamName || "Locutor",
+      text: newMessage,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isAdmin: true
+    };
+
+    socketRef.current?.emit("chat_message", msg);
+    setNewMessage("");
+  };
+
+  const handleLogout = async () => {
+    stopBroadcast();
+    await logout();
+    navigate("/auth");
+  };
+
+  if (!isLive && !stream) {
+    return (
+      <div className="min-h-screen bg-brand-bg flex items-center justify-center p-6">
+        <Helmet>
+          <title>Iniciar Transmisión | Vida Mixe TV</title>
+        </Helmet>
+        <div className="w-full max-w-md bg-brand-surface border border-white/10 rounded-[2.5rem] p-10 shadow-2xl text-center space-y-8">
+          <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-3xl flex items-center justify-center mx-auto">
+            <Video className="w-10 h-10" />
           </div>
-        )}
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-white">¡Listo para transmitir!</h1>
+            <p className="text-neutral-400">Para comenzar, necesitamos acceso a tu cámara y micrófono.</p>
+          </div>
 
-        {!isStreaming && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 text-center z-10">
-            {!isSocketConnected ? (
-              <>
-                <div className="w-20 h-20 bg-brand-secondary/10 text-brand-secondary rounded-full flex items-center justify-center mb-6">
-                  <Loader2 className="w-10 h-10 animate-spin" />
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">Conectando al servidor...</h2>
-                <div className="text-neutral-400 mb-8 max-w-md text-center space-y-4">
-                  <p>{socketError || "Estableciendo conexión en tiempo real. Por favor espera."}</p>
-                  {socketError && (
-                    <button 
-                      onClick={() => window.location.reload()}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm"
-                    >
-                      <RefreshCw className="w-4 h-4" /> Reintentar Conexión
-                    </button>
-                  )}
-                </div>
-              </>
+          {hasPermissions === false && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm">
+              No se pudo acceder a la cámara o micrófono. Por favor, verifica los permisos de tu navegador.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {!stream ? (
+              <button 
+                onClick={requestPermissions}
+                className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3"
+              >
+                <Video className="w-5 h-5" />
+                Habilitar Cámara y Micrófono
+              </button>
             ) : (
-              <>
-                <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6">
-                  <Video className="w-10 h-10" />
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">Listo para transmitir</h2>
-                <div className="w-full max-w-md space-y-4 mb-8">
-                  <div className="text-left">
-                    <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider mb-1.5 ml-1">
-                      Nombre de la Transmisión
-                    </label>
-                    <input 
-                      type="text"
-                      value={streamName}
-                      onChange={(e) => setStreamName(e.target.value)}
-                      placeholder="Ej: Concierto en la Sierra, Noticias Ayuuk..."
-                      className="w-full bg-brand-surface border border-white/5 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                    />
+              <div className="space-y-4">
+                <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-white/10">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-brand-primary/80 text-white text-[10px] font-bold uppercase rounded-full">
+                    Vista Previa
                   </div>
-                  <p className="text-neutral-400 text-sm text-center">
-                    Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
-                  </p>
                 </div>
-                <div className="flex gap-4">
-                  <button
-                    onClick={startStream}
-                    className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl transition-colors shadow-lg shadow-brand-primary/20"
-                  >
-                    Iniciar Transmisión
-                  </button>
-                  <button
-                    onClick={flipCamera}
-                    className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors border border-white/5"
-                    title="Voltear Cámara"
-                  >
-                    <Camera className="w-6 h-6" />
-                  </button>
-                </div>
-              </>
+                <input
+                  type="text"
+                  value={streamName}
+                  onChange={(e) => setStreamName(e.target.value)}
+                  placeholder="Nombre de la transmisión"
+                  className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
+                />
+                <button 
+                  onClick={startBroadcast}
+                  className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
+                >
+                  Comenzar ahora
+                </button>
+              </div>
             )}
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
 
-        {isStreaming && (
-          <>
-            <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
-              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSocketConnected ? 'bg-brand-primary/40' : 'bg-brand-secondary/40'}`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isSocketConnected ? 'bg-brand-primary' : 'bg-brand-secondary'}`}></span>
-                </span>
-                <span className="text-xs font-medium tracking-wider text-white uppercase">
-                  {isSocketConnected ? 'En Vivo' : 'Reconectando...'}
-                </span>
+  return (
+    <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col">
+      <Helmet>
+        <title>Panel de Transmisión | Vida Mixe TV</title>
+      </Helmet>
+
+      <div className="flex-1 flex flex-col lg:flex-row">
+        {/* Video Area */}
+        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className={`w-full h-full object-cover ${isVideoOff ? 'hidden' : 'block'}`}
+          />
+          
+          {isVideoOff && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-900">
+              <div className="w-24 h-24 bg-brand-primary/10 rounded-full flex items-center justify-center mb-4">
+                <VideoOff className="w-12 h-12 text-brand-primary" />
               </div>
-              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
-                <Users className="w-4 h-4 text-brand-accent" /> {viewers}
+              <p className="text-neutral-500 font-medium">Cámara desactivada</p>
+            </div>
+          )}
+
+          {/* Overlay Controls */}
+          <div className="absolute top-6 left-6 flex flex-col gap-3">
+            <div className="flex items-center gap-4">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border ${isLive ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-white/10 border-white/10 text-neutral-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-neutral-500'}`} />
+                <span className="text-xs font-bold uppercase tracking-widest">{isLive ? 'En Vivo' : 'Offline'}</span>
               </div>
-              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-xs font-medium text-white">
-                <Clock className="w-4 h-4 text-brand-secondary" /> {formatUptime(uptime)}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white">
+                <Users className="w-4 h-4" />
+                <span className="text-xs font-bold">{viewers}</span>
               </div>
-              {isRecording && (
-                <div className="flex items-center gap-2 bg-brand-primary/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-brand-primary/50 text-xs font-medium text-brand-primary animate-pulse">
-                  <Circle className="w-3 h-3 fill-brand-primary text-brand-primary" /> REC {formatUptime(recordingTime)}
-                </div>
+            </div>
+            
+            {isRecording && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-600/20 border border-red-500 text-red-500 backdrop-blur-md w-fit">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest">Grabando: {formatTime(recordingTime)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 px-8 py-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={toggleMute}
+                disabled={!stream}
+                className={`p-4 rounded-full transition-all disabled:opacity-50 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title={isMuted ? "Activar Micrófono" : "Silenciar Micrófono"}
+              >
+                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+              </button>
+              <button 
+                onClick={toggleVideo}
+                disabled={!stream}
+                className={`p-4 rounded-full transition-all disabled:opacity-50 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title={isVideoOff ? "Activar Cámara" : "Desactivar Cámara"}
+              >
+                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+              </button>
+            </div>
+
+            <div className="w-px h-8 bg-white/10 mx-2" />
+
+            <div className="flex items-center gap-2">
+              {!isRecording ? (
+                <button 
+                  onClick={startRecording}
+                  disabled={!stream}
+                  className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all disabled:opacity-50"
+                  title="Iniciar Grabación"
+                >
+                  <Circle className="w-6 h-6 fill-red-500 text-red-500" />
+                </button>
+              ) : (
+                <button 
+                  onClick={stopRecording}
+                  className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all"
+                  title="Detener Grabación"
+                >
+                  <Square className="w-6 h-6 fill-white" />
+                </button>
               )}
             </div>
 
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/50 backdrop-blur-md p-4 rounded-2xl border border-white/10 z-10">
-              <button
-                onClick={toggleRecording}
-                className={`p-4 rounded-full transition-colors ${isRecording ? 'bg-brand-primary hover:bg-brand-primary/80 text-white' : 'bg-white/5 hover:bg-white/10 text-white'}`}
-                title={isRecording ? "Detener Grabación" : "Iniciar Grabación"}
-              >
-                {isRecording ? <Square className="w-6 h-6 fill-current" /> : <Circle className="w-6 h-6 fill-brand-primary text-brand-primary" />}
-              </button>
-              <div className="w-px h-8 bg-white/10 mx-2"></div>
-              <button
-                onClick={toggleVideo}
-                className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-brand-primary hover:bg-brand-primary/80 text-white'}`}
-              >
-                {videoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-              </button>
-              <button
-                onClick={toggleAudio}
-                className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-white/5 hover:bg-white/10 text-white' : 'bg-brand-primary hover:bg-brand-primary/80 text-white'}`}
-                title={audioEnabled ? "Silenciar Micrófono" : "Activar Micrófono"}
-              >
-                {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-              </button>
-              <button
-                onClick={flipCamera}
-                className="p-4 bg-white/5 hover:bg-white/10 text-white rounded-full transition-colors"
-                title="Voltear Cámara"
-              >
-                <Camera className="w-6 h-6" />
-              </button>
-              <button
-                onClick={stopStream}
-                className="px-6 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-full transition-colors ml-2"
-              >
-                Detener
-              </button>
-            </div>
-          </>
-        )}
+            <div className="w-px h-8 bg-white/10 mx-2" />
 
-        {error && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 backdrop-blur-md text-white p-4 rounded-xl flex items-center gap-3 z-50 shadow-lg">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            <p>{error}</p>
+            {!isLive ? (
+              <button 
+                onClick={startBroadcast}
+                className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-brand-primary/20"
+              >
+                <Power className="w-5 h-5" />
+                <span>Iniciar Transmisión</span>
+              </button>
+            ) : (
+              <button 
+                onClick={stopBroadcast}
+                className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-red-600/20"
+              >
+                <Power className="w-5 h-5" />
+                <span>Detener</span>
+              </button>
+            )}
           </div>
-        )}
-      </div>
-
-      <div className="absolute top-4 right-4 z-50 flex gap-2">
-        <Link
-          to="/recordings"
-          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
-          title="Ver Grabaciones"
-        >
-          <Save className="w-6 h-6" />
-        </Link>
-        <button
-          onClick={() => setShowUserList(!showUserList)}
-          className={`p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showUserList ? 'bg-brand-primary hover:bg-brand-primary/80' : 'bg-black/50 hover:bg-black/70'}`}
-          title="Ver espectadores"
-        >
-          <Users className="w-6 h-6" />
-        </button>
-        <button
-          onClick={handleShare}
-          className="p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg"
-          title="Copiar enlace de espectador"
-        >
-          {copied ? <Check className="w-6 h-6 text-brand-primary" /> : <Share2 className="w-6 h-6" />}
-        </button>
-        <button
-          onClick={() => {
-            setShowChat(!showChat);
-            if (!showChat) setUnreadMessages(0);
-          }}
-          className={`relative p-3 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg ${showChat ? 'bg-brand-accent hover:bg-brand-accent/80' : 'bg-black/50 hover:bg-black/70'}`}
-        >
-          <MessageSquare className="w-6 h-6" />
-          {!showChat && unreadMessages > 0 && (
-            <span className="absolute -top-1 -right-1 bg-brand-primary text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
-              {unreadMessages > 9 ? '9+' : unreadMessages}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* User List Panel */}
-      <div 
-        className={`absolute top-20 right-4 w-64 bg-brand-surface/90 backdrop-blur-md border border-white/5 rounded-xl overflow-hidden transition-all duration-300 z-40 ${
-          showUserList ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'
-        }`}
-      >
-        <div className="p-3 border-b border-white/10 bg-black/20">
-          <h3 className="font-semibold text-sm">Espectadores ({connectedUsers.length})</h3>
         </div>
-        <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-          {connectedUsers.length === 0 ? (
-            <p className="text-xs text-neutral-500 text-center py-4">No hay usuarios registrados</p>
-          ) : (
-            connectedUsers.map(user => (
-              <div key={user.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 transition-colors group">
-                <span className="text-sm truncate max-w-[120px]">{user.username}</span>
-                {!isPrivateCallActive && (
-                  <button 
-                    onClick={() => startPrivateCall(user)}
-                    className="p-1.5 bg-brand-primary/20 text-brand-primary hover:bg-brand-primary hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                    title="Llamada privada"
-                  >
-                    <Phone className="w-3 h-3" />
-                  </button>
-                )}
+
+        {/* Sidebar */}
+        <div className="w-full lg:w-96 bg-brand-surface border-l border-white/5 flex flex-col">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-brand-primary/20 text-brand-primary rounded-xl flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
               </div>
-            ))
-          )}
-        </div>
-      </div>
+              <div>
+                <h2 className="font-bold text-white">Panel de Transmisión</h2>
+                <p className="text-[10px] text-neutral-500 uppercase tracking-widest">{user?.name || streamName || "Invitado"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="p-2 text-neutral-500 hover:text-white transition-colors">
+                <Settings className="w-5 h-5" />
+              </button>
+              {user ? (
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                  title="Cerrar Sesión"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              ) : (
+                <button 
+                  onClick={() => { stopBroadcast(); navigate("/"); }}
+                  className="p-2 text-neutral-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                  title="Salir"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
 
-      <div 
-        className={`absolute top-0 right-0 h-full w-full md:w-80 lg:w-96 transition-transform duration-300 ease-in-out z-40 ${
-          showChat ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <Chat socket={socket} isHost={true} transparent={true} />
+          {/* Chat */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-4 bg-white/5 flex items-center gap-2 text-xs font-bold text-neutral-400 uppercase tracking-widest">
+              <MessageSquare className="w-4 h-4" />
+              Chat en Vivo
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {messages.map((msg) => (
+                <div key={msg.id} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold ${msg.isAdmin ? 'text-brand-primary' : 'text-neutral-400'}`}>
+                      {msg.user}
+                    </span>
+                    <span className="text-[10px] text-neutral-600">{msg.time}</span>
+                  </div>
+                  <p className="text-sm text-neutral-300 bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                    {msg.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <form onSubmit={sendMessage} className="p-6 border-t border-white/5">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Escribe un mensaje..."
+                  className="w-full bg-brand-bg border border-white/10 rounded-2xl pl-4 pr-12 py-3 text-sm text-white outline-none focus:border-brand-primary/50 transition-all"
+                />
+                <button 
+                  type="submit"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-brand-primary hover:text-brand-primary/80 transition-colors"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,154 +1,91 @@
-import { useEffect, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
-import { MonitorPlay, VideoOff, Loader2, Volume2, VolumeX } from "lucide-react";
-import { getSocketUrl } from "../utils/socket";
-
-const config = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:global.stun.twilio.com:3478" }
-  ]
-};
-
-interface Broadcaster {
-  id: string;
-  name: string;
-  viewers: number;
-}
+import React, { useEffect, useState } from "react";
+import { io } from "socket.io-client";
+import { MonitorPlay, Users, Play } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 
 export default function LivePreview() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [currentStreamName, setCurrentStreamName] = useState("");
+  const [isLive, setIsLive] = useState(false);
+  const [viewers, setViewers] = useState(0);
+  const [streamName, setStreamName] = useState("");
 
   useEffect(() => {
-    const socketUrl = getSocketUrl();
-    const s = io(socketUrl, {
-      timeout: 10000,
-    });
-    setSocket(s);
+    const socket = io();
 
-    s.on("connect", () => {
-      s.emit("get_broadcasters");
-      setLoading(false);
-    });
-
-    s.on("broadcaster_list", (list: Broadcaster[]) => {
-      if (list.length > 0 && !isBroadcasting) {
-        const first = list[0];
-        setCurrentStreamName(first.name);
-        s.emit("watcher", first.id);
-      } else if (list.length === 0) {
-        setIsBroadcasting(false);
-        if (videoRef.current) videoRef.current.srcObject = null;
+    socket.on("broadcaster_list", (list: any[]) => {
+      if (list.length > 0) {
+        setIsLive(true);
+        setStreamName(list[0].name);
+        setViewers(list.reduce((acc, b) => acc + b.viewers, 0));
+      } else {
+        setIsLive(false);
       }
     });
 
-    s.on("broadcaster", () => {
-      s.emit("get_broadcasters");
-    });
-
-    s.on("offer", async (id, description) => {
-      peerConnection.current = new RTCPeerConnection(config);
-      
-      peerConnection.current.ontrack = (event) => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = event.streams[0];
-        }
-        setIsBroadcasting(true);
-      };
-
-      peerConnection.current.onicecandidate = (event) => {
-        if (event.candidate) {
-          s.emit("candidate", id, event.candidate);
-        }
-      };
-
-      try {
-        await peerConnection.current.setRemoteDescription(description);
-        const answer = await peerConnection.current.createAnswer();
-        await peerConnection.current.setLocalDescription(answer);
-        s.emit("answer", id, peerConnection.current.localDescription);
-      } catch (err) {
-        console.error("Error handling offer in preview:", err);
-      }
-    });
-
-    s.on("candidate", (id, candidate) => {
-      peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-    });
-
-    s.on("disconnectPeer", (id: string) => {
-      peerConnection.current?.close();
-      setIsBroadcasting(false);
-      if (videoRef.current) videoRef.current.srcObject = null;
-      s.emit("get_broadcasters");
-    });
+    socket.emit("get_broadcasters");
 
     return () => {
-      s.disconnect();
-      peerConnection.current?.close();
+      socket.disconnect();
     };
   }, []);
 
   return (
-    <div className="relative w-full aspect-video bg-stone-950 rounded-2xl overflow-hidden border border-stone-800 shadow-2xl group">
-      {isBroadcasting ? (
-        <>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isMuted}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute top-4 left-4 flex items-center gap-2">
-            <span className="flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-white bg-red-500/20 backdrop-blur-md px-2 py-0.5 rounded border border-red-500/30">
-              En Vivo: {currentStreamName}
-            </span>
-          </div>
-          
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className="absolute bottom-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+    <div className="relative aspect-video bg-stone-900 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl group">
+      <AnimatePresence mode="wait">
+        {isLive ? (
+          <motion.div 
+            key="live"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0"
           >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
-        </>
-      ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
-          {loading ? (
-            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-          ) : (
-            <>
-              <div className="w-16 h-16 bg-stone-900 rounded-full flex items-center justify-center text-stone-700">
-                <VideoOff className="w-8 h-8" />
+            <img 
+              src="https://picsum.photos/seed/live-stream/800/450" 
+              alt="Live Stream Preview" 
+              className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            
+            <div className="absolute top-6 left-6 flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600 rounded-full text-[10px] font-bold uppercase tracking-widest text-white animate-pulse">
+                En Vivo
               </div>
-              <div>
-                <h4 className="text-stone-200 font-medium">Sin señal en vivo</h4>
-                <p className="text-stone-500 text-xs mt-1">Vuelve más tarde para ver la transmisión</p>
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-bold text-white">
+                <Users className="w-3 h-3" />
+                {viewers}
               </div>
-            </>
-          )}
-        </div>
-      )}
-      
-      {/* Overlay link to full view */}
-      {isBroadcasting && (
-        <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors cursor-pointer flex items-center justify-center group/btn">
-           <div className="px-4 py-2 bg-emerald-600 text-white rounded-full text-sm font-bold opacity-0 group-hover/btn:opacity-100 transition-all transform translate-y-2 group-hover/btn:translate-y-0 shadow-xl">
-             Abrir Pantalla Completa
-           </div>
-        </div>
-      )}
+            </div>
+
+            <div className="absolute bottom-6 left-6 right-6">
+              <h4 className="text-white font-bold text-lg truncate mb-1">{streamName}</h4>
+              <p className="text-neutral-400 text-xs uppercase tracking-widest font-medium">Sintonizando ahora</p>
+            </div>
+
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="w-16 h-16 bg-brand-primary text-white rounded-full flex items-center justify-center shadow-2xl shadow-brand-primary/40 scale-90 group-hover:scale-100 transition-transform">
+                <Play className="w-8 h-8 fill-current ml-1" />
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div 
+            key="offline"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex flex-col items-center justify-center space-y-4 p-8 text-center"
+          >
+            <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center text-neutral-700">
+              <MonitorPlay className="w-10 h-10" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-white font-bold">Sin transmisiones</h4>
+              <p className="text-neutral-500 text-sm">Vuelve pronto para ver contenido en vivo de la comunidad.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

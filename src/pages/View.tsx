@@ -1,524 +1,538 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { MonitorPlay, AlertCircle, Loader2, MessageSquare, VideoOff, Phone, X, Check, RefreshCw, Facebook, Share2, Users, Camera } from "lucide-react";
+import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
-import Chat from "../components/Chat";
-import { getSocketUrl } from "../utils/socket";
-
-interface Broadcaster {
-  id: string;
-  name: string;
-  viewers: number;
-}
+import { motion, AnimatePresence } from "motion/react";
 
 const config = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:global.stun.twilio.com:3478" }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:stun2.l.google.com:19302"] },
+    { urls: ["stun:stun3.l.google.com:19302"] },
+    { urls: ["stun:stun4.l.google.com:19302"] }
   ]
 };
 
 export default function View() {
+  const [broadcasters, setBroadcasters] = useState<any[]>([]);
+  const [selectedBroadcaster, setSelectedBroadcaster] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [viewers, setViewers] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [username, setUsername] = useState("");
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const [showControls, setShowControls] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
-  const privateVideoRef = useRef<HTMLVideoElement>(null); // Video para la llamada privada
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
-  
-  // Private Call State
-  const [incomingCall, setIncomingCall] = useState(false);
-  const [pendingOffer, setPendingOffer] = useState<{ callerId: string, description: RTCSessionDescriptionInit } | null>(null);
-  const [isPrivateCallActive, setIsPrivateCallActive] = useState(false);
-  const privatePeerConnection = useRef<RTCPeerConnection | null>(null);
-  const [privateStream, setPrivateStream] = useState<MediaStream | null>(null);
-  
-  const [isConnected, setIsConnected] = useState(false);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [streamEnded, setStreamEnded] = useState(false);
-  const [showChat, setShowChat] = useState(true);
-  const [socketError, setSocketError] = useState<string | null>(null);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [broadcasters, setBroadcasters] = useState<Broadcaster[]>([]);
-  const [selectedBroadcasterId, setSelectedBroadcasterId] = useState<string | null>(null);
-  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
-
-  // Sound ref
-  const notificationSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    notificationSound.current = new Audio("https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3");
-    notificationSound.current.volume = 0.5;
-  }, []);
+    const socket = io();
+    socketRef.current = socket;
 
-  const playNotification = () => {
-    if (notificationSound.current) {
-      notificationSound.current.currentTime = 0;
-      notificationSound.current.play().catch(e => console.log("Audio play failed", e));
-    }
-  };
-
-  // Handle Private Call
-  const rejectPrivateCall = () => {
-    setIncomingCall(false);
-    setPendingOffer(null);
-    // Optionally emit rejection event
-  };
-
-  const endPrivateCall = () => {
-    if (privateStream) {
-      privateStream.getTracks().forEach(track => track.stop());
-      setPrivateStream(null);
-    }
-    if (privatePeerConnection.current) {
-      privatePeerConnection.current.close();
-      privatePeerConnection.current = null;
-    }
-    setIsPrivateCallActive(false);
-  };
-
-  const flipPrivateCamera = async () => {
-    if (!privateStream || !isPrivateCallActive) return;
-    
-    const newFacingMode = facingMode === "user" ? "environment" : "user";
-    setFacingMode(newFacingMode);
-    
-    try {
-      // Stop current video tracks
-      privateStream.getVideoTracks().forEach(track => track.stop());
-      
-      const newVideoStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: newFacingMode
-        }
-      });
-      
-      const newVideoTrack = newVideoStream.getVideoTracks()[0];
-      
-      // Update local private stream
-      const combinedStream = new MediaStream([newVideoTrack, ...privateStream.getAudioTracks()]);
-      setPrivateStream(combinedStream);
-      
-      // Replace track in peer connection
-      if (privatePeerConnection.current) {
-        const sender = privatePeerConnection.current.getSenders().find(s => s.track?.kind === "video");
-        if (sender) {
-          sender.replaceTrack(newVideoTrack);
-        }
-      }
-    } catch (err) {
-      console.error("Error flipping private camera:", err);
-    }
-  };
-
-  const shareToFacebook = () => {
-    const url = window.location.href;
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank');
-  };
-
-  const selectBroadcaster = (id: string) => {
-    if (selectedBroadcasterId === id) return;
-    
-    // Limpiar conexión previa si existe
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-    
-    setSelectedBroadcasterId(id);
-    setIsBroadcasting(false);
-    setStreamEnded(false);
-    
-    if (socket) {
-      socket.emit("watcher", id);
-    }
-  };
-
-  useEffect(() => {
-    if (privateVideoRef.current && privateStream) {
-      privateVideoRef.current.srcObject = privateStream;
-    }
-  }, [privateStream]);
-
-  useEffect(() => {
-    const socketUrl = getSocketUrl();
-
-    const s = io(socketUrl, {
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      timeout: 20000,
-    });
-    setSocket(s);
-
-    s.on("connect", () => {
-      setIsConnected(true);
-      setSocketError(null);
-      s.emit("get_broadcasters");
-    });
-
-    s.on("broadcaster_list", (list: Broadcaster[]) => {
+    socket.on("broadcaster_list", (list: any[]) => {
       setBroadcasters(list);
     });
 
-    s.on("connect_error", (err) => {
-      setIsConnected(false);
-      setSocketError(`Error al conectar con ${socketUrl}: ${err.message}`);
-      console.error("Socket connection error:", err);
-    });
+    socket.emit("get_broadcasters");
 
-    s.on("broadcaster", () => {
-      s.emit("get_broadcasters");
-    });
-
-    s.on("chat_message", (message: any) => {
-      if (!showChat) {
-        setUnreadMessages(prev => prev + 1);
-        playNotification();
+    socket.on("offer", (id: string, description: RTCSessionDescriptionInit) => {
+      // Close existing connection if any
+      if (peerConnection.current) {
+        peerConnection.current.close();
       }
-    });
 
-    // Private Call Logic
-    s.on("private_offer", async (callerId: string, description: RTCSessionDescriptionInit) => {
-      setPendingOffer({ callerId, description });
-      setIncomingCall(true);
-    });
-
-    s.on("private_candidate", (callerId: string, candidate: RTCIceCandidateInit) => {
-      if (privatePeerConnection.current) {
-        privatePeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-      }
-    });
-
-    s.on("offer", async (id: string, description: RTCSessionDescriptionInit) => {
-      peerConnection.current = new RTCPeerConnection(config);
-      setStreamEnded(false);
+      const pc = new RTCPeerConnection(config);
+      peerConnection.current = pc;
       
-      peerConnection.current.ontrack = event => {
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("candidate", id, event.candidate);
+        }
+      };
+
+      pc.ontrack = (event) => {
         if (videoRef.current) {
           videoRef.current.srcObject = event.streams[0];
-          setIsBroadcasting(true);
-          setStreamEnded(false);
         }
       };
 
-      peerConnection.current.onicecandidate = event => {
-        if (event.candidate) {
-          s.emit("candidate", id, event.candidate);
-        }
-      };
+      pc.setRemoteDescription(description)
+        .then(() => pc.createAnswer())
+        .then(sdp => pc.setLocalDescription(sdp))
+        .then(() => {
+          socket.emit("answer", id, pc.localDescription);
+        })
+        .catch(err => console.error("Error handling offer:", err));
+    });
 
-      try {
-        await peerConnection.current.setRemoteDescription(description);
-        const answer = await peerConnection.current.createAnswer();
-        await peerConnection.current.setLocalDescription(answer);
-        s.emit("answer", id, peerConnection.current.localDescription);
-
-        // Process any candidates that arrived before remote description was set
-        while (pendingCandidates.current.length > 0) {
-          const candidate = pendingCandidates.current.shift();
-          if (candidate) {
-            peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-          }
-        }
-      } catch (err) {
-        console.error("Error handling offer:", err);
+    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+      if (peerConnection.current) {
+        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+          console.error("Error adding ice candidate:", err);
+        });
       }
     });
 
-    s.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      if (peerConnection.current && peerConnection.current.remoteDescription) {
-        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(console.error);
-      } else {
-        pendingCandidates.current.push(candidate);
-      }
+    socket.on("chat_message", (msg) => {
+      setMessages(prev => [...prev, msg]);
     });
 
-    s.on("disconnectPeer", (id: string) => {
-      if (id === selectedBroadcasterId) {
-        peerConnection.current?.close();
-        setIsBroadcasting(false);
-        setStreamEnded(true);
-        setSelectedBroadcasterId(null);
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-        }
-        endPrivateCall();
-      }
-      s.emit("get_broadcasters");
+    socket.on("viewers_count", (count: number) => {
+      setViewers(count);
     });
 
-    s.on("disconnect", () => {
-      setIsConnected(false);
-      setIsBroadcasting(false);
-      peerConnection.current?.close();
-      endPrivateCall();
+    socket.on("disconnectPeer", () => {
+      if (videoRef.current) videoRef.current.srcObject = null;
+      if (peerConnection.current) {
+        peerConnection.current.close();
+        peerConnection.current = null;
+      }
     });
 
     return () => {
-      s.disconnect();
-      peerConnection.current?.close();
-      endPrivateCall();
+      socket.disconnect();
+      if (peerConnection.current) {
+        peerConnection.current.close();
+      }
     };
-  }, [selectedBroadcasterId]);
+  }, []);
 
-  // Real implementation of acceptPrivateCall that uses the stored offer
-  const handleAcceptCall = async () => {
-    if (!pendingOffer || !socket) return;
-    
-    const { callerId, description } = pendingOffer;
+  const joinStream = (broadcaster: any) => {
+    setSelectedBroadcaster(broadcaster);
+    setMessages([]);
+    socketRef.current?.emit("watcher", broadcaster.id);
+  };
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setPrivateStream(stream);
-      
-      const pc = new RTCPeerConnection(config);
-      privatePeerConnection.current = pc;
-
-      stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
-      });
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("private_candidate", callerId, event.candidate);
-        }
-      };
-
-      await pc.setRemoteDescription(description);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      
-      socket.emit("private_answer", callerId, pc.localDescription);
-      
-      setIncomingCall(false);
-      setIsPrivateCallActive(true);
-    } catch (err) {
-      console.error("Error accepting call:", err);
-      alert("Error al iniciar la llamada privada.");
-      setIncomingCall(false);
+  const reconnect = () => {
+    if (selectedBroadcaster) {
+      socketRef.current?.emit("watcher", selectedBroadcaster.id);
     }
   };
 
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim()) return;
+    socketRef.current?.emit("register_user", username);
+    setIsRegistered(true);
+  };
+
+  const sendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !isRegistered) return;
+
+    const msg = {
+      id: Date.now().toString(),
+      user: username,
+      text: newMessage,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isAdmin: false
+    };
+
+    socketRef.current?.emit("chat_message", msg);
+    setNewMessage("");
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      const newMuted = !isMuted;
+      videoRef.current.muted = newMuted;
+      setIsMuted(newMuted);
+      if (newMuted) {
+        setVolume(0);
+      } else {
+        setVolume(1);
+        videoRef.current.volume = 1;
+      }
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+      videoRef.current.muted = newVolume === 0;
+      setIsMuted(newVolume === 0);
+    }
+  };
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  };
+
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (isPlaying) {
+        setShowControls(false);
+      }
+    }, 3000);
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleDurationChange = () => setDuration(video.duration);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("durationchange", handleDurationChange);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+
+    return () => {
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("durationchange", handleDurationChange);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+    };
+  }, [selectedBroadcaster]);
+
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return "00:00";
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className="relative w-full h-[calc(100vh-64px)] bg-brand-bg text-neutral-50 overflow-hidden">
+    <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col">
       <Helmet>
-        <title>Ver Transmisión en Vivo | Vida Mixe TV</title>
-        <meta name="description" content="Mira las transmisiones en vivo de la comunidad Mixe. Únete al chat y participa en la conversación." />
+        <title>Ver en Vivo | Vida Mixe TV</title>
       </Helmet>
-      <div className="absolute inset-0 bg-black flex items-center justify-center">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          controls
-          className="w-full h-full object-contain"
-        />
-        
-        {/* Incoming Call Modal */}
-        {incomingCall && (
-          <div className="absolute inset-0 flex items-center justify-center bg-brand-bg/80 z-50 backdrop-blur-sm">
-            <div className="bg-brand-surface p-6 rounded-2xl border border-white/5 shadow-2xl max-w-sm w-full text-center">
-              <div className="w-16 h-16 bg-brand-primary/20 text-brand-primary rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <Phone className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">Invitación a Video</h3>
-              <p className="text-neutral-400 mb-6">
-                El anfitrión te está invitando a unirte a una videollamada privada.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button 
-                  onClick={rejectPrivateCall}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl transition-colors"
-                >
-                  Rechazar
-                </button>
-                <button 
-                  onClick={handleAcceptCall}
-                  className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
-                >
-                  <Phone className="w-4 h-4" /> Aceptar
-                </button>
+
+      {!isRegistered ? (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md bg-brand-surface border border-white/10 rounded-[2.5rem] p-10 shadow-2xl text-center space-y-8"
+          >
+            <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-3xl flex items-center justify-center mx-auto">
+              <MonitorPlay className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold text-white">¡Bienvenido!</h1>
+              <p className="text-neutral-400">Ingresa tu nombre para unirte a la transmisión y participar en el chat.</p>
+            </div>
+            <form onSubmit={handleRegister} className="space-y-4">
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Tu nombre o apodo"
+                className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
+              />
+              <button 
+                type="submit"
+                className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
+              >
+                Unirse ahora
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col lg:flex-row">
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col">
+            {/* Video Player Area */}
+            <div 
+              ref={containerRef}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={() => isPlaying && setShowControls(false)}
+              className="flex-1 relative bg-black flex items-center justify-center overflow-hidden group/player"
+            >
+              {selectedBroadcaster ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    onClick={togglePlay}
+                    className="w-full h-full object-contain cursor-pointer"
+                  />
+                  
+                  {/* Player Controls Overlay */}
+                  <AnimatePresence>
+                    {showControls && (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none"
+                      >
+                        <div className="p-6 space-y-4 pointer-events-auto">
+                          {/* Progress Bar (Seeker) - Mostly for UI/VOD support, stays at end for Live */}
+                          <div className="group/progress relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer overflow-hidden">
+                            <div 
+                              className="absolute top-0 left-0 h-full bg-brand-primary transition-all"
+                              style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
+                            />
+                            <input 
+                              type="range"
+                              min="0"
+                              max={duration || 0}
+                              value={currentTime}
+                              onChange={(e) => {
+                                if (videoRef.current) {
+                                  videoRef.current.currentTime = parseFloat(e.target.value);
+                                }
+                              }}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                              <button 
+                                onClick={togglePlay} 
+                                className="p-2 text-white hover:text-brand-primary transition-colors"
+                              >
+                                {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current" />}
+                              </button>
+
+                              <div className="flex items-center gap-3 group/volume">
+                                <button onClick={toggleMute} className="p-2 text-white hover:text-brand-primary transition-colors">
+                                  {isMuted || volume === 0 ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                                </button>
+                                <div className="w-0 group-hover/volume:w-24 overflow-hidden transition-all duration-300 flex items-center">
+                                  <input 
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.05"
+                                    value={volume}
+                                    onChange={handleVolumeChange}
+                                    className="w-full accent-brand-primary h-1 rounded-full cursor-pointer"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 text-xs font-bold text-white/80 tabular-nums">
+                                <span>{formatTime(currentTime)}</span>
+                                <span className="text-white/30">/</span>
+                                <span>{duration > 0 ? formatTime(duration) : "LIVE"}</span>
+                              </div>
+
+                              <button onClick={reconnect} className="p-2 text-white hover:text-brand-primary transition-colors" title="Reconectar">
+                                <RefreshCw className="w-5 h-5" />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                              <div className="hidden md:block text-sm font-bold text-white/60 tracking-tight">
+                                {selectedBroadcaster.name}
+                              </div>
+                              <button 
+                                onClick={toggleFullscreen}
+                                className="p-2 text-white hover:text-brand-primary transition-colors"
+                              >
+                                {isFullscreen ? <Minimize2 className="w-6 h-6" /> : <Maximize2 className="w-6 h-6" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Top Overlay Info */}
+                  <div className={`absolute top-6 left-6 flex items-center gap-3 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600 rounded-full text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-red-900/40">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                      En Vivo
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-bold text-white shadow-xl">
+                      <Users className="w-3 h-3 text-brand-primary" />
+                      {viewers}
+                    </div>
+                  </div>
+
+                  {/* Big Play/Pause Indicator on Click */}
+                  <AnimatePresence>
+                    {!isPlaying && (
+                      <motion.div 
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 1.5, opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                      >
+                        <div className="w-20 h-20 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10">
+                          <Play className="w-10 h-10 text-white fill-current ml-1" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center space-y-6 p-12 text-center">
+                  <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center animate-pulse">
+                    <MonitorPlay className="w-12 h-12 text-neutral-700" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-bold text-white">No hay transmisiones activas</h2>
+                    <p className="text-neutral-500 max-w-xs">Selecciona un canal de la lista o espera a que alguien inicie una transmisión.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Stream Info & Actions */}
+            <div className="bg-brand-surface border-t border-white/5 p-6 md:p-8">
+              <div className="max-w-4xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-brand-primary/20 text-brand-primary rounded-2xl flex items-center justify-center">
+                    <MonitorPlay className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-white">
+                      {selectedBroadcaster?.name || "Vida Mixe TV"}
+                    </h1>
+                    <p className="text-neutral-500 text-sm">Transmisión oficial de la Sierra Norte</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => setIsLiked(!isLiked)}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all ${isLiked ? 'bg-red-500 text-white' : 'bg-white/5 text-neutral-400 hover:bg-white/10'}`}
+                  >
+                    <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+                    {isLiked ? 'Me gusta' : 'Apoyar'}
+                  </button>
+                  <button className="p-3 bg-white/5 text-neutral-400 hover:bg-white/10 rounded-full transition-all">
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Private Call Active Indicator */}
-        {isPrivateCallActive && (
-          <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-brand-primary/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
-            <Phone className="w-4 h-4 text-white" />
-            <span className="text-sm font-medium text-white">En llamada privada con el anfitrión</span>
-            <button 
-              onClick={flipPrivateCamera}
-              className="ml-2 p-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-              title="Voltear Cámara"
-            >
-              <Camera className="w-3 h-3 text-white" />
-            </button>
-            <button 
-              onClick={endPrivateCall}
-              className="ml-1 p-1 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-            >
-              <X className="w-3 h-3 text-white" />
-            </button>
-          </div>
-        )}
-
-        {/* Private Call Local Video Overlay */}
-        {isPrivateCallActive && (
-          <div className="absolute bottom-24 right-4 w-48 h-36 bg-brand-surface rounded-xl border border-white/10 shadow-2xl overflow-hidden z-30">
-             <video
-                ref={privateVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
-             />
-             <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-[10px] text-white flex items-center gap-1">
-               <Users className="w-3 h-3 text-brand-primary" />
-               Tú
-             </div>
-          </div>
-        )}
-
-        {/* Stream Selector Overlay */}
-        {!isBroadcasting && isConnected && broadcasters.length > 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 z-40">
-            <div className="w-full max-w-2xl space-y-6">
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold text-white">Transmisiones Disponibles</h2>
-                <p className="text-neutral-400">Selecciona una transmisión para comenzar a ver</p>
-              </div>
-              
-              <div className="grid sm:grid-cols-2 gap-4">
-                {broadcasters.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => selectBroadcaster(b.id)}
-                    className="flex flex-col items-start p-6 bg-brand-surface border border-white/5 rounded-2xl hover:bg-brand-surface/80 hover:border-brand-primary/50 transition-all text-left group"
-                  >
-                    <div className="flex items-center justify-between w-full mb-4">
-                      <div className="w-10 h-10 bg-brand-primary/10 text-brand-primary rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+          {/* Sidebar */}
+          <div className="w-full lg:w-96 bg-brand-surface border-l border-white/5 flex flex-col">
+            {/* Channels List */}
+            <div className="p-6 border-b border-white/5">
+              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Canales Disponibles</h3>
+              <div className="space-y-3">
+                {broadcasters.length > 0 ? (
+                  broadcasters.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => joinStream(b)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all ${selectedBroadcaster?.id === b.id ? 'bg-brand-primary/10 border border-brand-primary/20' : 'bg-white/5 border border-transparent hover:bg-white/10'}`}
+                    >
+                      <div className="w-10 h-10 bg-brand-primary/20 text-brand-primary rounded-xl flex items-center justify-center flex-shrink-0">
                         <MonitorPlay className="w-5 h-5" />
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-brand-primary bg-brand-primary/10 px-2 py-1 rounded">
-                        <span className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-pulse"></span>
-                        EN VIVO
+                      <div className="flex-1 text-left overflow-hidden">
+                        <p className="text-sm font-bold text-white truncate">{b.name}</p>
+                        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">En Vivo • {b.viewers} espectadores</p>
                       </div>
-                    </div>
-                    <h3 className="text-lg font-semibold text-white mb-1 line-clamp-1">{b.name}</h3>
-                    <div className="flex items-center gap-2 text-neutral-500 text-sm">
-                      <Users className="w-4 h-4" />
-                      <span>{b.viewers} espectadores</span>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-neutral-600 italic">No hay otros canales...</p>
+                )}
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Facebook Share Button */}
-        {isBroadcasting && (
-          <div className="absolute top-4 right-4 z-20 flex gap-2">
-            <button 
-              onClick={shareToFacebook}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white text-sm font-bold rounded-full shadow-lg transition-all hover:scale-105"
-            >
-              <Facebook className="w-4 h-4" />
-              Compartir en Facebook
-            </button>
-          </div>
-        )}
-
-        {!isBroadcasting && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg/90 backdrop-blur-sm p-6 text-center z-10">
-            {isConnected ? (
-              <>
-                {streamEnded ? (
-                  <>
-                    <div className="w-20 h-20 bg-white/5 text-neutral-400 rounded-full flex items-center justify-center mb-6">
-                      <VideoOff className="w-10 h-10" />
-                    </div>
-                    <h2 className="text-2xl font-semibold mb-2">Transmisión finalizada</h2>
-                    <p className="text-neutral-400 mb-8 max-w-md">
-                      El transmisor ha finalizado el video en vivo o se ha perdido la conexión.
-                    </p>
-                    <div className="flex items-center gap-3 text-neutral-500">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Esperando que se reanude...</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-20 h-20 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6">
-                      <MonitorPlay className="w-10 h-10" />
-                    </div>
-                    <h2 className="text-2xl font-semibold mb-2">Esperando transmisión</h2>
-                    <p className="text-neutral-400 mb-8 max-w-md">
-                      El transmisor aún no ha iniciado el video en vivo. La reproducción comenzará automáticamente.
-                    </p>
-                    <div className="flex items-center gap-3 text-brand-primary">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Conectado al servidor</span>
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="w-20 h-20 bg-brand-secondary/10 text-brand-secondary rounded-full flex items-center justify-center mb-6">
-                  <Loader2 className="w-10 h-10 animate-spin" />
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">Conectando...</h2>
-                <div className="text-neutral-400 mb-8 max-w-md text-center space-y-4">
-                  <p>{socketError || "Estableciendo conexión con el servidor de transmisión."}</p>
-                  {socketError && (
-                    <button 
-                      onClick={() => window.location.reload()}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm"
+            {/* Chat */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-4 bg-white/5 flex items-center gap-2 text-xs font-bold text-neutral-400 uppercase tracking-widest">
+                <MessageSquare className="w-4 h-4" />
+                Chat Comunitario
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <AnimatePresence>
+                  {messages.map((msg) => (
+                    <motion.div 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      key={msg.id} 
+                      className="space-y-1"
                     >
-                      <RefreshCw className="w-4 h-4" /> Reintentar Conexión
-                    </button>
-                  )}
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${msg.isAdmin ? 'text-brand-primary' : 'text-neutral-400'}`}>
+                          {msg.user}
+                        </span>
+                        <span className="text-[10px] text-neutral-600">{msg.time}</span>
+                      </div>
+                      <p className="text-sm text-neutral-300 bg-white/5 p-3 rounded-2xl rounded-tl-none">
+                        {msg.text}
+                      </p>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+              <form onSubmit={sendMessage} className="p-6 border-t border-white/5">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Escribe un mensaje..."
+                    className="w-full bg-brand-bg border border-white/10 rounded-2xl pl-4 pr-12 py-3 text-sm text-white outline-none focus:border-brand-primary/50 transition-all"
+                  />
+                  <button 
+                    type="submit"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-brand-primary hover:text-brand-primary/80 transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
                 </div>
-              </>
-            )}
+              </form>
+            </div>
           </div>
-        )}
-
-        {isBroadcasting && (
-          <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 z-10">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
-            <span className="text-xs font-medium tracking-wider text-white uppercase">En Vivo</span>
-          </div>
-        )}
-      </div>
-
-      <button
-        onClick={() => {
-          setShowChat(!showChat);
-          if (!showChat) setUnreadMessages(0);
-        }}
-        className="absolute top-4 right-4 z-50 p-3 bg-black/50 hover:bg-black/70 backdrop-blur-md rounded-full border border-white/10 text-white transition-all shadow-lg relative"
-      >
-        <MessageSquare className="w-6 h-6" />
-        {!showChat && unreadMessages > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce">
-            {unreadMessages > 9 ? '9+' : unreadMessages}
-          </span>
-        )}
-      </button>
-
-      <div 
-        className={`absolute top-0 right-0 h-full w-full md:w-80 lg:w-96 transition-transform duration-300 ease-in-out z-40 ${
-          showChat ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <Chat socket={socket} isHost={false} transparent={true} />
-      </div>
+        </div>
+      )}
     </div>
   );
 }

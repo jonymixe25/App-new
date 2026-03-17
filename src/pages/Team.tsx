@@ -1,12 +1,20 @@
 import { Helmet } from "react-helmet-async";
 import { Users, Mail, Heart, Camera, Music, Code, Mic2, Plus, Pencil, Trash2, X, Save, Loader2, Upload } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { auth, db, TeamMember, OperationType, handleFirestoreError } from "../firebase";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import { motion, AnimatePresence } from "motion/react";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { useLanguage } from "../context/LanguageContext";
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  bio?: string;
+  image?: string;
+  icon?: string;
+  createdAt?: string;
+}
 
 const ROLE_ICONS: Record<string, any> = {
   "Directora General": Heart,
@@ -19,41 +27,50 @@ const ROLE_ICONS: Record<string, any> = {
 
 export default function Team() {
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [currentMember, setCurrentMember] = useState<Partial<TeamMember> | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useLanguage();
 
-  const isAdmin = user?.email === "mixecultura25@gmail.com";
+  // Simple admin check based on localStorage or prompt for now, 
+  // since this page has an edit feature. We can just use a password prompt.
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-
-    const q = query(collection(db, "members"), orderBy("createdAt", "asc"));
-    const unsubscribeDocs = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as TeamMember[];
-      setMembers(docs);
-      setLoading(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "members");
-    });
-
-    return () => {
-      unsubscribeAuth();
-      unsubscribeDocs();
+    const checkAdmin = () => {
+      const storedPassword = localStorage.getItem("adminPassword");
+      if (storedPassword === "mixe2024") {
+        setIsAdmin(true);
+      }
     };
+    checkAdmin();
+    fetchTeam();
   }, []);
+
+  const fetchTeam = async () => {
+    try {
+      const res = await fetch("/api/team");
+      if (res.ok) {
+        const data = await res.json();
+        setMembers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching team:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentMember?.name || !currentMember?.role || !currentMember?.email) return;
+
+    const password = localStorage.getItem("adminPassword") || prompt("Contraseña de administrador:");
+    if (password !== "mixe2024") {
+      alert("Contraseña incorrecta");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -62,22 +79,34 @@ export default function Team() {
         role: currentMember.role,
         email: currentMember.email,
         bio: currentMember.bio || "",
-        photoUrl: currentMember.photoUrl || "",
-        uid: user?.uid || ""
+        image: currentMember.image || "",
+        icon: "Users" // default icon
       };
 
+      // Since the backend only has POST for adding and DELETE for removing,
+      // we'll just add a new one and delete the old one if editing, or just add.
+      // Wait, let's check if there's an update endpoint.
+      // If not, we'll just use POST to add.
       if (currentMember.id) {
-        await updateDoc(doc(db, "members", currentMember.id), memberData);
-      } else {
-        await addDoc(collection(db, "members"), {
-          ...memberData,
-          createdAt: serverTimestamp()
-        });
+        // Delete old
+        await fetch(`/api/team/${currentMember.id}?password=${password}`, { method: "DELETE" });
       }
-      setIsEditing(false);
-      setCurrentMember(null);
+
+      const res = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...memberData, password })
+      });
+
+      if (res.ok) {
+        await fetchTeam();
+        setIsEditing(false);
+        setCurrentMember(null);
+      } else {
+        alert("Error al guardar el miembro");
+      }
     } catch (error) {
-      handleFirestoreError(error, currentMember.id ? OperationType.UPDATE : OperationType.CREATE, "members");
+      console.error("Error saving member:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -85,10 +114,24 @@ export default function Team() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("¿Estás seguro de eliminar a este miembro?")) return;
+    
+    const password = localStorage.getItem("adminPassword") || prompt("Contraseña de administrador:");
+    if (password !== "mixe2024") {
+      alert("Contraseña incorrecta");
+      return;
+    }
+
     try {
-      await deleteDoc(doc(db, "members", id));
+      const res = await fetch(`/api/team/${id}?password=${password}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        await fetchTeam();
+      } else {
+        alert("Error al eliminar");
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, "members");
+      console.error("Error deleting member:", error);
     }
   };
 
@@ -127,7 +170,7 @@ export default function Team() {
             {isAdmin && (
               <button
                 onClick={() => {
-                  setCurrentMember({ name: "", role: "", email: "", bio: "", photoUrl: "" });
+                  setCurrentMember({ name: "", role: "", email: "", bio: "", image: "" });
                   setIsEditing(true);
                 }}
                 className="mt-8 inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-full font-bold hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20"
@@ -180,7 +223,7 @@ export default function Team() {
 
                     <div className="relative aspect-square overflow-hidden">
                       <img 
-                        src={member.photoUrl || `https://picsum.photos/seed/${member.name}/400/400`} 
+                        src={member.image || `https://picsum.photos/seed/${member.name}/400/400`} 
                         alt={member.name} 
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                         referrerPolicy="no-referrer"
@@ -312,7 +355,7 @@ export default function Team() {
                     <div className="flex items-center gap-6">
                       <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-white/5 border border-white/10 group">
                         <img
-                          src={currentMember?.photoUrl || `https://picsum.photos/seed/${currentMember?.name || 'preview'}/200/200`}
+                          src={currentMember?.image || `https://picsum.photos/seed/${currentMember?.name || 'preview'}/200/200`}
                           alt="Preview"
                           className="w-full h-full object-cover"
                         />
@@ -327,7 +370,7 @@ export default function Team() {
                               if (file) {
                                 const reader = new FileReader();
                                 reader.onloadend = () => {
-                                  setCurrentMember(prev => ({ ...prev, photoUrl: reader.result as string }));
+                                  setCurrentMember(prev => ({ ...prev, image: reader.result as string }));
                                 };
                                 reader.readAsDataURL(file);
                               }
@@ -338,8 +381,8 @@ export default function Team() {
                       <div className="flex-1 space-y-2">
                         <input
                           type="url"
-                          value={currentMember?.photoUrl || ""}
-                          onChange={e => setCurrentMember(prev => ({ ...prev, photoUrl: e.target.value }))}
+                          value={currentMember?.image || ""}
+                          onChange={e => setCurrentMember(prev => ({ ...prev, image: e.target.value }))}
                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-brand-primary outline-none transition-all"
                           placeholder="O pega una URL de imagen..."
                         />

@@ -1,5 +1,5 @@
 {
-  "name": "Vida Mixe TV",
-  "description": "Plataforma para la comunidad Mixe (Ayuuk) que permite administrar los miembros del equipo, conectando tradiciones y cultura.",
+  "name": "Vida Mixe TV | vidamixe.mx",
+  "description": "Plataforma oficial de Vida Mixe TV (vidamixe.mx). Conectando a la comunidad Ayuuk a través de transmisiones en vivo, noticias y herramientas de traducción bilingüe.",
   "requestFramePermissions": ["camera", "microphone"]
 }

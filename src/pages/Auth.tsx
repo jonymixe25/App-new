@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { User, Lock, ArrowRight, Video, UserPlus, LogIn, ArrowLeft } from "lucide-react";
+import { User as UserIcon, Lock, ArrowRight, UserPlus, LogIn, ArrowLeft } from "lucide-react";
+import { loginWithGoogle } from "../firebase";
+import { useUser } from "../contexts/UserContext";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,6 +13,29 @@ export default function Auth() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useUser();
+
+  const from = (location.state as any)?.from?.pathname || "/transmitir";
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await loginWithGoogle();
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      if (err.code === "auth/popup-closed-by-user") {
+        // User closed the popup, don't show a scary error or log it as an error
+        setError(null);
+      } else {
+        console.error("Google login error:", err);
+        setError("Error al iniciar sesión con Google. Inténtalo de nuevo.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,10 +66,8 @@ export default function Auth() {
       }
 
       const data = await res.json();
-
-      // Store user in localStorage
-      localStorage.setItem("broadcaster_user", JSON.stringify(data.user));
-      navigate("/admin");
+      login(data.user);
+      navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -78,71 +101,91 @@ export default function Auth() {
               : "Regístrate para comenzar a compartir tu cultura"}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+          <div className="space-y-4">
+            <button 
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="w-full bg-white text-stone-900 font-bold py-3 rounded-xl flex items-center justify-center gap-3 hover:bg-stone-100 transition-all disabled:opacity-50"
+            >
+              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+              Continuar con Google
+            </button>
+
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-stone-800"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-stone-900 px-2 text-stone-500 font-bold">O usa tu cuenta</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {!isLogin && (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider ml-1">Nombre Completo</label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-3 w-5 h-5 text-stone-600" />
+                    <input 
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Tu nombre"
+                      className="w-full bg-stone-800 border border-stone-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider ml-1">Nombre Completo</label>
+                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider ml-1">Usuario</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 w-5 h-5 text-stone-600" />
+                  <UserIcon className="absolute left-3 top-3 w-5 h-5 text-stone-600" />
                   <input 
                     type="text"
                     required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Tu nombre"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="nombre_usuario"
                     className="w-full bg-stone-800 border border-stone-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
                   />
                 </div>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider ml-1">Usuario</label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 w-5 h-5 text-stone-600" />
-                <input 
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="nombre_usuario"
-                  className="w-full bg-stone-800 border border-stone-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                />
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider ml-1">Contraseña</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 w-5 h-5 text-stone-600" />
+                  <input 
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-stone-800 border border-stone-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider ml-1">Contraseña</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 w-5 h-5 text-stone-600" />
-                <input 
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-stone-800 border border-stone-700 rounded-xl pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-                />
-              </div>
-            </div>
+              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
-            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  {isLogin ? "Entrar" : "Registrarse"}
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </button>
-          </form>
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-4 rounded-xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    {isLogin ? "Entrar" : "Registrarse"}
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
 
           <div className="mt-8 pt-6 border-t border-stone-800 text-center">
             <button 
