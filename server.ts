@@ -283,6 +283,25 @@ async function startServer() {
     res.json({ success: true, user: { id: user.id, username: user.username, name: user.name } });
   });
 
+  app.get("/api/auth/users", (req, res) => {
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    const users = db.prepare("SELECT id, username, name FROM broadcasters").all();
+    res.json(users);
+  });
+
+  app.delete("/api/auth/users/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    db.prepare("DELETE FROM broadcasters WHERE id = ?").run(id);
+    res.json({ success: true });
+  });
+
   // Catch-all for API routes to prevent falling through to Vite
   app.all("/api/*all", (req, res) => {
     console.log(`404 API: ${req.method} ${req.url}`);
