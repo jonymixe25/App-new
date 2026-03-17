@@ -25,11 +25,11 @@ export default function Auth() {
       await loginWithGoogle();
       navigate(from, { replace: true });
     } catch (err: any) {
-      console.error("Google login error:", err);
       if (err.code === "auth/popup-closed-by-user") {
-        // User closed the popup, don't show a scary error
+        // User closed the popup, don't show a scary error or log it as an error
         setError(null);
       } else {
+        console.error("Google login error:", err);
         setError("Error al iniciar sesión con Google. Inténtalo de nuevo.");
       }
     } finally {
