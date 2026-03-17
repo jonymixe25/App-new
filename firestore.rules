@@ -41,11 +41,7 @@ service cloud.firestore {
     }
 
     function isValidUrl(url) {
-      return url is string && (
-        url.matches("^https://.*") || 
-        url.matches("^http://.*") || 
-        url.matches("^data:image/.*")
-      );
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
     }
 
     function hasRequiredFields(fields) {
@@ -64,7 +60,7 @@ service cloud.firestore {
              data.role is string && data.role.size() > 0 && data.role.size() <= 100 &&
              isValidEmail(data.email) &&
              (!('bio' in data) || data.bio == "" || (data.bio is string && data.bio.size() <= 500)) &&
-             (!('photoUrl' in data) || data.photoUrl == "" || (isValidUrl(data.photoUrl) && data.photoUrl.size() <= 1048576)) &&
+             (!('photoUrl' in data) || data.photoUrl == "" || isValidUrl(data.photoUrl)) &&
              (!('uid' in data) || data.uid is string) &&
              data.createdAt is timestamp;
     }

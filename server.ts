@@ -406,7 +406,7 @@ async function startServer() {
   });
 
   // Catch-all for API routes to prevent falling through to Vite
-  app.all("/api/*all", (req, res) => {
+  app.all("/api/*", (req, res) => {
     console.log(`404 API: ${req.method} ${req.url}`);
     res.status(404).json({ error: `Ruta de API no encontrada: ${req.url}` });
   });
@@ -420,7 +420,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static("dist"));
-    app.get("*all", (req, res) => {
+    app.get("*", (req, res) => {
       res.sendFile(path.resolve(__dirname, "dist", "index.html"));
     });
   }

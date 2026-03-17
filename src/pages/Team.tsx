@@ -84,7 +84,7 @@ export default function Team() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm(t('team_confirmDelete'))) return;
+    if (!window.confirm("¿Estás seguro de eliminar a este miembro?")) return;
     try {
       await deleteDoc(doc(db, "members", id));
     } catch (error) {
@@ -96,8 +96,8 @@ export default function Team() {
     <ErrorBoundary>
       <div className="min-h-screen bg-brand-bg text-neutral-50 font-sans">
         <Helmet>
-          <title>{t('team_title')} | Vida Mixe TV</title>
-          <meta name="description" content={t('team_subtitle')} />
+          <title>{t.team.title} | Vida Mixe TV</title>
+          <meta name="description" content="Conoce a las personas detrás de Vida Mixe TV, trabajando para difundir la cultura Ayuuk." />
         </Helmet>
 
         {/* Hero Section */}
@@ -115,13 +115,13 @@ export default function Team() {
           <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-primary/20 border border-brand-primary/30 text-brand-primary backdrop-blur-sm">
               <Users className="w-4 h-4" />
-              <span className="text-sm font-medium tracking-wide uppercase">{t('team_peopleOfClouds')}</span>
+              <span className="text-sm font-medium tracking-wide uppercase">Gente de las Nubes</span>
             </div>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white">
-              {t('team_title').split(' ')[0]} <span className="text-brand-primary">{t('team_title').split(' ')[1]}</span>
+              {t.team.title.split(' ')[0]} <span className="text-brand-primary">{t.team.title.split(' ')[1]}</span>
             </h1>
             <p className="text-xl text-neutral-400 font-light leading-relaxed">
-              {t('team_subtitle')}
+              {t.team.subtitle}
             </p>
 
             {isAdmin && (
@@ -133,7 +133,7 @@ export default function Team() {
                 className="mt-8 inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-full font-bold hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20"
               >
                 <Plus className="w-5 h-5" />
-                {t('team_addMember')}
+                {t.team.addMember}
               </button>
             )}
           </div>
@@ -144,7 +144,7 @@ export default function Team() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 space-y-4">
               <Loader2 className="w-12 h-12 text-brand-primary animate-spin" />
-              <p className="text-neutral-400">{t('team_loading')}</p>
+              <p className="text-neutral-400">Cargando equipo...</p>
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -204,7 +204,7 @@ export default function Team() {
                       </div>
                       
                       <p className="text-neutral-400 text-sm leading-relaxed min-h-[3rem]">
-                        {member.bio || t('team_defaultBio')}
+                        {member.bio || "Miembro del equipo de Vida Mixe TV."}
                       </p>
 
                       <div className="flex items-center gap-4 pt-4 border-t border-white/5">
@@ -222,9 +222,9 @@ export default function Team() {
           {/* Vision Section */}
           <div className="mt-24 bg-brand-surface/50 border border-white/5 rounded-[3rem] p-12 md:p-20 text-center space-y-8">
             <div className="max-w-3xl mx-auto space-y-6">
-              <h2 className="text-3xl md:text-5xl font-bold text-white">{t('team_missionTitle')}</h2>
+              <h2 className="text-3xl md:text-5xl font-bold text-white">Nuestra Misión</h2>
               <p className="text-lg text-neutral-400 leading-relaxed italic">
-                "{t('team_missionDesc')}"
+                "Fortalecer la identidad Ayuuk mediante el uso de herramientas tecnológicas modernas, creando un puente entre nuestra herencia ancestral y las nuevas generaciones, sin importar en qué parte del mundo se encuentren."
               </p>
               <div className="w-20 h-1 bg-brand-primary mx-auto rounded-full"></div>
             </div>
@@ -250,7 +250,7 @@ export default function Team() {
               >
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-2xl font-bold text-white">
-                    {currentMember?.id ? t('team_editModalTitle') : t('team_newModalTitle')}
+                    {currentMember?.id ? "Editar Miembro" : "Nuevo Miembro"}
                   </h2>
                   <button onClick={() => setIsEditing(false)} className="text-neutral-500 hover:text-white">
                     <X className="w-6 h-6" />
@@ -259,26 +259,26 @@ export default function Team() {
 
                 <form onSubmit={handleSave} className="space-y-6">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">{t('team_fullName')}</label>
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Nombre Completo</label>
                     <input
                       required
                       type="text"
                       value={currentMember?.name || ""}
                       onChange={e => setCurrentMember(prev => ({ ...prev, name: e.target.value }))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all"
-                      placeholder={t('team_namePlaceholder')}
+                      placeholder="Ej. Juan Pérez"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">{t('team_role')}</label>
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Rol / Puesto</label>
                     <select
                       required
                       value={currentMember?.role || ""}
                       onChange={e => setCurrentMember(prev => ({ ...prev, role: e.target.value }))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all"
                     >
-                      <option value="" disabled className="bg-brand-surface">{t('team_selectRole')}</option>
+                      <option value="" disabled className="bg-brand-surface">Seleccionar rol</option>
                       {Object.keys(ROLE_ICONS).map(role => (
                         <option key={role} value={role} className="bg-brand-surface">{role}</option>
                       ))}
@@ -286,29 +286,29 @@ export default function Team() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">{t('team_email')}</label>
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Correo Electrónico</label>
                     <input
                       required
                       type="email"
                       value={currentMember?.email || ""}
                       onChange={e => setCurrentMember(prev => ({ ...prev, email: e.target.value }))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all"
-                      placeholder={t('team_emailPlaceholder')}
+                      placeholder="correo@vidamixe.tv"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">{t('team_shortBio')}</label>
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Biografía Corta</label>
                     <textarea
                       value={currentMember?.bio || ""}
                       onChange={e => setCurrentMember(prev => ({ ...prev, bio: e.target.value }))}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all resize-none h-24"
-                      placeholder={t('team_bioPlaceholder')}
+                      placeholder="Breve descripción del miembro..."
                     />
                   </div>
 
                   <div className="space-y-4">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">{t('team_profilePhoto')}</label>
+                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Foto de Perfil</label>
                     <div className="flex items-center gap-6">
                       <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-white/5 border border-white/10 group">
                         <img
@@ -341,9 +341,9 @@ export default function Team() {
                           value={currentMember?.photoUrl || ""}
                           onChange={e => setCurrentMember(prev => ({ ...prev, photoUrl: e.target.value }))}
                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-brand-primary outline-none transition-all"
-                          placeholder={t('team_photoUrlPlaceholder')}
+                          placeholder="O pega una URL de imagen..."
                         />
-                        <p className="text-[10px] text-neutral-500">{t('team_photoDesc')}</p>
+                        <p className="text-[10px] text-neutral-500">Puedes subir un archivo o pegar un enlace directo.</p>
                       </div>
                     </div>
                   </div>
@@ -354,7 +354,7 @@ export default function Team() {
                       onClick={() => setIsEditing(false)}
                       className="flex-1 px-6 py-3 rounded-xl border border-white/10 text-white font-bold hover:bg-white/5 transition-all"
                     >
-                      {t('team_cancel')}
+                      Cancelar
                     </button>
                     <button
                       type="submit"
@@ -362,7 +362,7 @@ export default function Team() {
                       className="flex-1 px-6 py-3 rounded-xl bg-brand-primary text-white font-bold hover:bg-brand-primary/80 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                      {t('team_save')}
+                      Guardar
                     </button>
                   </div>
                 </form>
