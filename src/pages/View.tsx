@@ -1,16 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2 } from "lucide-react";
+import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
 
 const config = {
   iceServers: [
-    { urls: ["stun:stun.l.google.com:19302"] },
-    { urls: ["stun:stun1.l.google.com:19302"] },
-    { urls: ["stun:stun2.l.google.com:19302"] },
-    { urls: ["stun:stun3.l.google.com:19302"] },
-    { urls: ["stun:stun4.l.google.com:19302"] }
+    {
+      urls: ["stun:stun.l.google.com:19302"]
+    }
   ]
 };
 
@@ -24,88 +22,60 @@ export default function View() {
   const [isLiked, setIsLiked] = useState(false);
   const [username, setUsername] = useState("");
   const [isRegistered, setIsRegistered] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [volume, setVolume] = useState(1);
-  const [showControls, setShowControls] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
 
   useEffect(() => {
-    const socket = io();
-    socketRef.current = socket;
+    socketRef.current = io();
 
-    socket.on("broadcaster_list", (list: any[]) => {
+    socketRef.current.on("broadcaster_list", (list: any[]) => {
       setBroadcasters(list);
     });
 
-    socket.emit("get_broadcasters");
+    socketRef.current.emit("get_broadcasters");
 
-    socket.on("offer", (id: string, description: RTCSessionDescriptionInit) => {
-      // Close existing connection if any
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
-
-      const pc = new RTCPeerConnection(config);
-      peerConnection.current = pc;
+    socketRef.current.on("offer", (id: string, description: RTCSessionDescriptionInit) => {
+      peerConnection.current = new RTCPeerConnection(config);
       
-      pc.onicecandidate = (event) => {
+      peerConnection.current.onicecandidate = (event) => {
         if (event.candidate) {
-          socket.emit("candidate", id, event.candidate);
+          socketRef.current?.emit("candidate", id, event.candidate);
         }
       };
 
-      pc.ontrack = (event) => {
+      peerConnection.current.ontrack = (event) => {
         if (videoRef.current) {
           videoRef.current.srcObject = event.streams[0];
         }
       };
 
-      pc.setRemoteDescription(description)
-        .then(() => pc.createAnswer())
-        .then(sdp => pc.setLocalDescription(sdp))
+      peerConnection.current
+        .setRemoteDescription(description)
+        .then(() => peerConnection.current?.createAnswer())
+        .then(sdp => peerConnection.current?.setLocalDescription(sdp))
         .then(() => {
-          socket.emit("answer", id, pc.localDescription);
-        })
-        .catch(err => console.error("Error handling offer:", err));
-    });
-
-    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      if (peerConnection.current) {
-        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
-          console.error("Error adding ice candidate:", err);
+          socketRef.current?.emit("answer", id, peerConnection.current?.localDescription);
         });
-      }
     });
 
-    socket.on("chat_message", (msg) => {
+    socketRef.current.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+      peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
+    socketRef.current.on("chat_message", (msg) => {
       setMessages(prev => [...prev, msg]);
     });
 
-    socket.on("viewers_count", (count: number) => {
-      setViewers(count);
-    });
-
-    socket.on("disconnectPeer", () => {
+    socketRef.current.on("disconnectPeer", () => {
       if (videoRef.current) videoRef.current.srcObject = null;
-      if (peerConnection.current) {
-        peerConnection.current.close();
-        peerConnection.current = null;
-      }
+      peerConnection.current?.close();
     });
 
     return () => {
-      socket.disconnect();
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
+      socketRef.current?.disconnect();
+      peerConnection.current?.close();
     };
   }, []);
 
@@ -113,12 +83,6 @@ export default function View() {
     setSelectedBroadcaster(broadcaster);
     setMessages([]);
     socketRef.current?.emit("watcher", broadcaster.id);
-  };
-
-  const reconnect = () => {
-    if (selectedBroadcaster) {
-      socketRef.current?.emit("watcher", selectedBroadcaster.id);
-    }
   };
 
   const handleRegister = (e: React.FormEvent) => {
@@ -146,100 +110,9 @@ export default function View() {
 
   const toggleMute = () => {
     if (videoRef.current) {
-      const newMuted = !isMuted;
-      videoRef.current.muted = newMuted;
-      setIsMuted(newMuted);
-      if (newMuted) {
-        setVolume(0);
-      } else {
-        setVolume(1);
-        videoRef.current.volume = 1;
-      }
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
     }
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-      videoRef.current.muted = newVolume === 0;
-      setIsMuted(newVolume === 0);
-    }
-  };
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const toggleFullscreen = () => {
-    if (!containerRef.current) return;
-
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  };
-
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
-        setShowControls(false);
-      }
-    }, 3000);
-  };
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    const handleDurationChange = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
-    video.addEventListener("timeupdate", handleTimeUpdate);
-    video.addEventListener("durationchange", handleDurationChange);
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handlePause);
-
-    return () => {
-      video.removeEventListener("timeupdate", handleTimeUpdate);
-      video.removeEventListener("durationchange", handleDurationChange);
-      video.removeEventListener("play", handlePlay);
-      video.removeEventListener("pause", handlePause);
-    };
-  }, [selectedBroadcaster]);
-
-  const formatTime = (time: number) => {
-    if (isNaN(time)) return "00:00";
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -285,133 +158,42 @@ export default function View() {
           {/* Main Content */}
           <div className="flex-1 flex flex-col">
             {/* Video Player Area */}
-            <div 
-              ref={containerRef}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={() => isPlaying && setShowControls(false)}
-              className="flex-1 relative bg-black flex items-center justify-center overflow-hidden group/player"
-            >
+            <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
               {selectedBroadcaster ? (
                 <>
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    onClick={togglePlay}
-                    className="w-full h-full object-contain cursor-pointer"
+                    className="w-full h-full object-contain"
                   />
                   
                   {/* Player Controls Overlay */}
-                  <AnimatePresence>
-                    {showControls && (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/80 via-transparent to-black/20 pointer-events-none"
-                      >
-                        <div className="p-6 space-y-4 pointer-events-auto">
-                          {/* Progress Bar (Seeker) - Mostly for UI/VOD support, stays at end for Live */}
-                          <div className="group/progress relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer overflow-hidden">
-                            <div 
-                              className="absolute top-0 left-0 h-full bg-brand-primary transition-all"
-                              style={{ width: `${(currentTime / duration) * 100 || 0}%` }}
-                            />
-                            <input 
-                              type="range"
-                              min="0"
-                              max={duration || 0}
-                              value={currentTime}
-                              onChange={(e) => {
-                                if (videoRef.current) {
-                                  videoRef.current.currentTime = parseFloat(e.target.value);
-                                }
-                              }}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-6">
-                              <button 
-                                onClick={togglePlay} 
-                                className="p-2 text-white hover:text-brand-primary transition-colors"
-                              >
-                                {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current" />}
-                              </button>
-
-                              <div className="flex items-center gap-3 group/volume">
-                                <button onClick={toggleMute} className="p-2 text-white hover:text-brand-primary transition-colors">
-                                  {isMuted || volume === 0 ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-                                </button>
-                                <div className="w-0 group-hover/volume:w-24 overflow-hidden transition-all duration-300 flex items-center">
-                                  <input 
-                                    type="range"
-                                    min="0"
-                                    max="1"
-                                    step="0.05"
-                                    value={volume}
-                                    onChange={handleVolumeChange}
-                                    className="w-full accent-brand-primary h-1 rounded-full cursor-pointer"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3 text-xs font-bold text-white/80 tabular-nums">
-                                <span>{formatTime(currentTime)}</span>
-                                <span className="text-white/30">/</span>
-                                <span>{duration > 0 ? formatTime(duration) : "LIVE"}</span>
-                              </div>
-
-                              <button onClick={reconnect} className="p-2 text-white hover:text-brand-primary transition-colors" title="Reconectar">
-                                <RefreshCw className="w-5 h-5" />
-                              </button>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                              <div className="hidden md:block text-sm font-bold text-white/60 tracking-tight">
-                                {selectedBroadcaster.name}
-                              </div>
-                              <button 
-                                onClick={toggleFullscreen}
-                                className="p-2 text-white hover:text-brand-primary transition-colors"
-                              >
-                                {isFullscreen ? <Minimize2 className="w-6 h-6" /> : <Maximize2 className="w-6 h-6" />}
-                              </button>
-                            </div>
-                          </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity">
+                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <button onClick={toggleMute} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors">
+                          {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                        </button>
+                        <div className="text-sm font-medium text-white">
+                          {selectedBroadcaster.name}
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Top Overlay Info */}
-                  <div className={`absolute top-6 left-6 flex items-center gap-3 transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600 rounded-full text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-red-900/40">
-                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                      En Vivo
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-bold text-white shadow-xl">
-                      <Users className="w-3 h-3 text-brand-primary" />
-                      {viewers}
+                      </div>
+                      <button className="p-2 text-white hover:bg-white/10 rounded-full transition-colors">
+                        <Maximize2 className="w-6 h-6" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Big Play/Pause Indicator on Click */}
-                  <AnimatePresence>
-                    {!isPlaying && (
-                      <motion.div 
-                        initial={{ scale: 0.5, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 1.5, opacity: 0 }}
-                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                      >
-                        <div className="w-20 h-20 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10">
-                          <Play className="w-10 h-10 text-white fill-current ml-1" />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <div className="absolute top-6 left-6 flex items-center gap-3">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600 rounded-full text-[10px] font-bold uppercase tracking-widest text-white animate-pulse">
+                      En Vivo
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-bold text-white">
+                      <Users className="w-3 h-3" />
+                      {viewers}
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center space-y-6 p-12 text-center">

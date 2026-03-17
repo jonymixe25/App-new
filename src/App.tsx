@@ -9,10 +9,7 @@ import AdminNews from "./pages/AdminNews";
 import Translator from "./pages/Translator";
 import Team from "./pages/Team";
 import Auth from "./pages/Auth";
-import AdminUsers from "./pages/AdminUsers";
 import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
-import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
@@ -28,12 +25,7 @@ export default function App() {
                 <Route path="/view" element={<View />} />
                 <Route path="/vista" element={<View />} />
                 <Route path="/recordings" element={<Recordings />} />
-                <Route path="/admin-news" element={
-                  <ProtectedRoute>
-                    <AdminNews />
-                  </ProtectedRoute>
-                } />
-                <Route path="/admin-users" element={<AdminUsers />} />
+                <Route path="/admin-news" element={<AdminNews />} />
                 <Route path="/traductor" element={<Translator />} />
                 <Route path="/team" element={<Team />} />
                 <Route path="/auth" element={<Auth />} />
@@ -53,7 +45,6 @@ export default function App() {
                 } />
               </Routes>
             </main>
-            <Footer />
           </div>
         </BrowserRouter>
       </LanguageProvider>

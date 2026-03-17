@@ -68,13 +68,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       await loginWithGoogle();
       onClose();
     } catch (err: any) {
-      if (err.code === "auth/popup-closed-by-user") {
-        // User closed the popup, don't show a scary error or log it as an error
-        setError(null);
-      } else {
-        console.error("Google login error:", err);
-        setError("Error al iniciar sesión con Google");
-      }
+      console.error("Google login error:", err);
+      setError("Error al iniciar sesión con Google");
     } finally {
       setLoading(false);
     }
