@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2 } from "lucide-react";
+import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
 
 const config = {
   iceServers: [
-    {
-      urls: ["stun:stun.l.google.com:19302"]
-    }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:stun2.l.google.com:19302"] },
+    { urls: ["stun:stun3.l.google.com:19302"] },
+    { urls: ["stun:stun4.l.google.com:19302"] }
   ]
 };
 
@@ -105,6 +107,12 @@ export default function View() {
     socketRef.current?.emit("watcher", broadcaster.id);
   };
 
+  const reconnect = () => {
+    if (selectedBroadcaster) {
+      socketRef.current?.emit("watcher", selectedBroadcaster.id);
+    }
+  };
+
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) return;
@@ -194,6 +202,9 @@ export default function View() {
                       <div className="flex items-center gap-4">
                         <button onClick={toggleMute} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors">
                           {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                        </button>
+                        <button onClick={reconnect} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors" title="Reconectar">
+                          <RefreshCw className="w-6 h-6" />
                         </button>
                         <div className="text-sm font-medium text-white">
                           {selectedBroadcaster.name}

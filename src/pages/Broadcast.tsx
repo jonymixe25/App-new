@@ -7,9 +7,11 @@ import { useUser } from "../contexts/UserContext";
 
 const config = {
   iceServers: [
-    {
-      urls: ["stun:stun.l.google.com:19302"]
-    }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:stun2.l.google.com:19302"] },
+    { urls: ["stun:stun3.l.google.com:19302"] },
+    { urls: ["stun:stun4.l.google.com:19302"] }
   ]
 };
 
@@ -36,6 +38,14 @@ export default function Broadcast() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!userLoading && !user) {
+      navigate("/auth");
+    } else if (user && !streamRef.current) {
+      requestPermissions();
+    }
+  }, [user, userLoading]);
+
+  useEffect(() => {
     // Initialize Socket.IO once
     const socket = io();
     socketRef.current = socket;
@@ -54,6 +64,16 @@ export default function Broadcast() {
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("candidate", id, event.candidate);
+        }
+      };
+
+      peerConnection.onnegotiationneeded = async () => {
+        try {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          socket.emit("offer", id, peerConnection.localDescription);
+        } catch (err) {
+          console.error("Negotiation error:", err);
         }
       };
 
@@ -114,9 +134,10 @@ export default function Broadcast() {
   }, [stream]);
 
   const startBroadcast = async () => {
-    if (!stream) {
-      const success = await requestPermissions();
-      if (!success) return;
+    let currentStream = stream;
+    if (!currentStream) {
+      currentStream = await requestPermissions();
+      if (!currentStream) return;
     }
     
     socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
@@ -126,20 +147,25 @@ export default function Broadcast() {
   const requestPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        },
         audio: true
       });
       
       setStream(mediaStream);
+      streamRef.current = mediaStream;
       setHasPermissions(true);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      return true;
+      return mediaStream;
     } catch (err) {
       console.error("Error accessing media devices:", err);
       setHasPermissions(false);
-      return false;
+      return null;
     }
   };
 
