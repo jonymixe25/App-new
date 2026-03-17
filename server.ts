@@ -27,11 +27,33 @@ db.exec(`
     videoUrl TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS community_videos (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    thumbnail TEXT NOT NULL,
+    price TEXT NOT NULL,
+    video_url TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS broadcasters (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     name TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS team (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    bio TEXT NOT NULL,
+    image TEXT NOT NULL,
+    icon TEXT NOT NULL,
+    linkedin TEXT,
+    twitter TEXT,
+    github TEXT,
+    email TEXT
   );
 `);
 
@@ -54,7 +76,89 @@ if (newsCount.count === 0) {
   );
 }
 
-  // No initial admin seeding needed
+const adminCount = db.prepare("SELECT COUNT(*) as count FROM broadcasters").get() as { count: number };
+if (adminCount.count === 0) {
+  db.prepare(`
+    INSERT INTO broadcasters (id, username, password, name)
+    VALUES (?, ?, ?, ?)
+  `).run("1", "admin", "password123", "Administrador");
+}
+
+console.log("Checking team count...");
+const teamCount = db.prepare("SELECT COUNT(*) as count FROM team").get() as { count: number };
+if (teamCount.count === 0) {
+  console.log("Seeding initial team data...");
+  const initialTeam = [
+    {
+      id: "1",
+      name: "Xunashi Martínez",
+      role: "Directora General",
+      bio: "Originaria de Tlahuitoltepec, Xunashi lidera la visión de Vida Mixe TV para llevar la cultura Ayuuk a audiencias globales.",
+      image: "https://picsum.photos/seed/xunashi/400/400",
+      icon: "Heart",
+      linkedin: "#",
+      email: "xunashi@vidamixe.tv"
+    },
+    {
+      id: "2",
+      name: "Pável González",
+      role: "Director de Producción",
+      bio: "Especialista en medios audiovisuales con 10 años de experiencia documentando las fiestas y tradiciones de la Sierra Norte.",
+      image: "https://picsum.photos/seed/pavel/400/400",
+      icon: "Camera",
+      twitter: "#",
+      email: "pavel@vidamixe.tv"
+    },
+    {
+      id: "3",
+      name: "Floriberto Díaz",
+      role: "Ingeniero de Sonido",
+      bio: "Músico del CECAM encargado de capturar la esencia de las bandas de viento con la más alta fidelidad.",
+      image: "https://picsum.photos/seed/floriberto/400/400",
+      icon: "Music",
+      email: "flor@vidamixe.tv"
+    },
+    {
+      id: "4",
+      name: "Citlali Rojas",
+      role: "Desarrolladora de Plataforma",
+      bio: "Encargada de la infraestructura digital que permite nuestras transmisiones en tiempo real desde la montaña.",
+      image: "https://picsum.photos/seed/citlali/400/400",
+      icon: "Code",
+      github: "#",
+      linkedin: "#"
+    },
+    {
+      id: "5",
+      name: "Mateo Jiménez",
+      role: "Locutor y Traductor",
+      bio: "La voz de nuestras noticias en Ayuuk y Español, asegurando que nuestro mensaje llegue a todos los rincones.",
+      image: "https://picsum.photos/seed/mateo/400/400",
+      icon: "Mic2",
+      twitter: "#"
+    }
+  ];
+
+  const insertTeam = db.prepare(`
+    INSERT INTO team (id, name, role, bio, image, icon, linkedin, twitter, github, email)
+    VALUES (@id, @name, @role, @bio, @image, @icon, @linkedin, @twitter, @github, @email)
+  `);
+
+  for (const member of initialTeam) {
+    insertTeam.run({
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      bio: member.bio,
+      image: member.image,
+      icon: member.icon,
+      linkedin: member.linkedin || null,
+      twitter: member.twitter || null,
+      github: member.github || null,
+      email: member.email || null
+    });
+  }
+}
 
 async function startServer() {
   const app = express();
@@ -219,6 +323,64 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Community Videos Routes
+  app.get("/api/community-videos", (req, res) => {
+    const videos = db.prepare("SELECT * FROM community_videos").all();
+    res.json(videos);
+  });
+
+  app.post("/api/community-videos", (req, res) => {
+    const { title, author, thumbnail, price, video_url, password } = req.body;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    const id = Date.now().toString();
+    db.prepare(`
+      INSERT INTO community_videos (id, title, author, thumbnail, price, video_url)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, title, author, thumbnail, price, video_url);
+    res.json({ id, title, author, thumbnail, price, video_url });
+  });
+
+  app.delete("/api/community-videos/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    db.prepare("DELETE FROM community_videos WHERE id = ?").run(id);
+    res.json({ success: true });
+  });
+
+  // Team Routes
+  app.get("/api/team", (req, res) => {
+    const team = db.prepare("SELECT * FROM team").all();
+    res.json(team);
+  });
+
+  app.post("/api/team", (req, res) => {
+    const { name, role, bio, image, icon, linkedin, twitter, github, email, password } = req.body;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    const id = Date.now().toString();
+    db.prepare(`
+      INSERT INTO team (id, name, role, bio, image, icon, linkedin, twitter, github, email)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, name, role, bio, image, icon, linkedin || null, twitter || null, github || null, email || null);
+    res.json({ id, name, role, bio, image, icon, linkedin, twitter, github, email });
+  });
+
+  app.delete("/api/team/:id", (req, res) => {
+    const { id } = req.params;
+    const { password } = req.query;
+    if (password !== "mixe2024") {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+    db.prepare("DELETE FROM team WHERE id = ?").run(id);
+    res.json({ success: true });
+  });
+
   // Auth endpoints
   app.post("/api/auth/register", (req, res) => {
     const { username, password, name } = req.body;
@@ -257,10 +419,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, "dist");
-    app.use(express.static(distPath));
+    app.use(express.static("dist"));
     app.get("*all", (req, res) => {
-      res.sendFile(path.resolve(distPath, "index.html"));
+      res.sendFile(path.resolve(__dirname, "dist", "index.html"));
     });
   }
 

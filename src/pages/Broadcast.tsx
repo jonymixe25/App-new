@@ -7,9 +7,11 @@ import { useUser } from "../contexts/UserContext";
 
 const config = {
   iceServers: [
-    {
-      urls: ["stun:stun.l.google.com:19302"]
-    }
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["stun:stun1.l.google.com:19302"] },
+    { urls: ["stun:stun2.l.google.com:19302"] },
+    { urls: ["stun:stun3.l.google.com:19302"] },
+    { urls: ["stun:stun4.l.google.com:19302"] }
   ]
 };
 
@@ -23,6 +25,7 @@ export default function Broadcast() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLive, setIsLive] = useState(false);
+  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   
@@ -35,79 +38,132 @@ export default function Broadcast() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Initialize Socket.IO
-    socketRef.current = io();
+    if (!streamRef.current) {
+      requestPermissions();
+    }
+  }, []);
 
-    socketRef.current.on("watcher", (id: string) => {
-        const peerConnection = new RTCPeerConnection(config);
-        peerConnections.current[id] = peerConnection;
+  useEffect(() => {
+    // Initialize Socket.IO once
+    const socket = io();
+    socketRef.current = socket;
 
-        if (stream) {
-          stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+    socket.on("watcher", (id: string) => {
+      const peerConnection = new RTCPeerConnection(config);
+      peerConnections.current[id] = peerConnection;
+
+      // Add tracks from current stream if it exists
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          peerConnection.addTrack(track, streamRef.current!);
+        });
+      }
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit("candidate", id, event.candidate);
         }
+      };
 
-        peerConnection.onicecandidate = (event) => {
-          if (event.candidate) {
-            socketRef.current?.emit("candidate", id, event.candidate);
-          }
-        };
-
-        peerConnection
-          .createOffer()
-          .then(sdp => peerConnection.setLocalDescription(sdp))
-          .then(() => {
-            socketRef.current?.emit("offer", id, peerConnection.localDescription);
-          });
-      });
-
-      socketRef.current.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
-        peerConnections.current[id].setRemoteDescription(description);
-      });
-
-      socketRef.current.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate));
-      });
-
-      socketRef.current.on("disconnectPeer", (id: string) => {
-        if (peerConnections.current[id]) {
-          peerConnections.current[id].close();
-          delete peerConnections.current[id];
+      peerConnection.onnegotiationneeded = async () => {
+        try {
+          const offer = await peerConnection.createOffer();
+          await peerConnection.setLocalDescription(offer);
+          socket.emit("offer", id, peerConnection.localDescription);
+        } catch (err) {
+          console.error("Negotiation error:", err);
         }
-      });
+      };
 
-      socketRef.current.on("chat_message", (msg) => {
-        setMessages(prev => [...prev, msg]);
-      });
+      peerConnection
+        .createOffer()
+        .then(sdp => peerConnection.setLocalDescription(sdp))
+        .then(() => {
+          socket.emit("offer", id, peerConnection.localDescription);
+        })
+        .catch(err => console.error("Error creating offer:", err));
+    });
 
-      socketRef.current.on("viewers_count", (count: number) => {
-        setViewers(count);
-      });
+    socket.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].setRemoteDescription(description).catch(err => {
+          console.error("Error setting remote description:", err);
+        });
+      }
+    });
+
+    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+          console.error("Error adding ice candidate:", err);
+        });
+      }
+    });
+
+    socket.on("disconnectPeer", (id: string) => {
+      if (peerConnections.current[id]) {
+        peerConnections.current[id].close();
+        delete peerConnections.current[id];
+      }
+    });
+
+    socket.on("chat_message", (msg) => {
+      setMessages(prev => [...prev, msg]);
+    });
+
+    socket.on("viewers_count", (count: number) => {
+      setViewers(count);
+    });
 
     return () => {
-      socketRef.current?.disconnect();
-      stream?.getTracks().forEach(track => track.stop());
+      socket.disconnect();
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
       Object.values(peerConnections.current).forEach(pc => pc.close());
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [navigate, stream, user, userLoading]);
+  }, []); // Only run once on mount
+
+  // Use a ref for the stream to access it inside socket listeners without re-binding
+  const streamRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
 
   const startBroadcast = async () => {
+    let currentStream = stream;
+    if (!currentStream) {
+      currentStream = await requestPermissions();
+      if (!currentStream) return;
+    }
+    
+    socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
+    setIsLive(true);
+  };
+
+  const requestPermissions = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        },
         audio: true
       });
       
       setStream(mediaStream);
+      streamRef.current = mediaStream;
+      setHasPermissions(true);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      
-      socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
-      setIsLive(true);
+      return mediaStream;
     } catch (err) {
       console.error("Error accessing media devices:", err);
-      alert("No se pudo acceder a la cámara o micrófono.");
+      setHasPermissions(false);
+      return null;
     }
   };
 
@@ -116,8 +172,7 @@ export default function Broadcast() {
     stream?.getTracks().forEach(track => track.stop());
     setStream(null);
     setIsLive(false);
-    socketRef.current?.disconnect();
-    socketRef.current = io(); // Reconnect for chat/status
+    socketRef.current?.emit("stop_broadcasting");
   };
 
   const toggleMute = () => {
@@ -227,22 +282,53 @@ export default function Broadcast() {
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-bold text-white">¡Listo para transmitir!</h1>
-            <p className="text-neutral-400">Ingresa el nombre de tu programa o canal para comenzar.</p>
+            <p className="text-neutral-400">Para comenzar, necesitamos acceso a tu cámara y micrófono.</p>
           </div>
+
+          {hasPermissions === false && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-sm">
+              No se pudo acceder a la cámara o micrófono. Por favor, verifica los permisos de tu navegador.
+            </div>
+          )}
+
           <div className="space-y-4">
-            <input
-              type="text"
-              value={streamName}
-              onChange={(e) => setStreamName(e.target.value)}
-              placeholder="Nombre de la transmisión"
-              className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
-            />
-            <button 
-              onClick={startBroadcast}
-              className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
-            >
-              Comenzar ahora
-            </button>
+            {!stream ? (
+              <button 
+                onClick={requestPermissions}
+                className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3"
+              >
+                <Video className="w-5 h-5" />
+                Habilitar Cámara y Micrófono
+              </button>
+            ) : (
+              <div className="space-y-4">
+                <div className="relative aspect-video bg-black rounded-2xl overflow-hidden border border-white/10">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-4 right-4 px-3 py-1 bg-brand-primary/80 text-white text-[10px] font-bold uppercase rounded-full">
+                    Vista Previa
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  value={streamName}
+                  onChange={(e) => setStreamName(e.target.value)}
+                  placeholder="Nombre de la transmisión"
+                  className="w-full bg-brand-bg border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-brand-primary/50 transition-all text-center text-lg"
+                />
+                <button 
+                  onClick={startBroadcast}
+                  className="w-full py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-2xl transition-all shadow-lg shadow-brand-primary/20"
+                >
+                  Comenzar ahora
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 {
-  "name": "Vida Mixe TV & Traductor",
-  "description": "Plataforma bilingüe para la comunidad Mixe (Ayuuk). Incluye transmisión en vivo, noticias y traductor inteligente.",
+  "name": "Vida Mixe TV | vidamixe.mx",
+  "description": "Plataforma oficial de Vida Mixe TV (vidamixe.mx). Conectando a la comunidad Ayuuk a través de transmisiones en vivo, noticias y herramientas de traducción bilingüe.",
   "requestFramePermissions": ["camera", "microphone"]
 }
