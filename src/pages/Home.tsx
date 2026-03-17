@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, Languages, Sparkles } from "lucide-react";
+import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, Languages, Sparkles, ArrowRight } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useEffect, useState } from "react";
 import LivePreview from "../components/LivePreview";
@@ -12,6 +12,7 @@ interface NewsItem {
   content: string;
   date: string;
   author: string;
+  imageUrl?: string;
 }
 
 export default function Home() {
@@ -147,25 +148,50 @@ export default function Home() {
           </div>
 
           <div className="grid lg:grid-cols-3 gap-12">
-            <div className="lg:col-span-2 space-y-8">
+            <div className="lg:col-span-2">
               <div className="grid md:grid-cols-2 gap-8">
                 {news.length > 0 ? (
                   news.map((item) => (
-                    <div key={item.id} className="bg-brand-surface border border-white/5 rounded-2xl p-8 hover:border-brand-primary/30 transition-all group">
-                      <div className="text-xs text-neutral-500 mb-4 flex items-center gap-2">
-                        <span>{new Date(item.date).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span>Por {item.author}</span>
+                    <div key={item.id} className="bg-brand-surface border border-white/5 rounded-3xl overflow-hidden hover:border-brand-primary/30 transition-all group flex flex-col shadow-xl shadow-black/20">
+                      <div className="aspect-video relative overflow-hidden">
+                        <img 
+                          src={item.imageUrl || `https://picsum.photos/seed/${item.id}/800/450`} 
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-brand-surface via-transparent to-transparent opacity-60"></div>
+                        <div className="absolute bottom-4 left-6">
+                          <span className="px-3 py-1 bg-brand-primary/90 text-white text-[10px] font-bold uppercase tracking-widest rounded-full backdrop-blur-sm">
+                            Noticia
+                          </span>
+                        </div>
                       </div>
-                      <h3 className="text-xl font-bold text-white mb-4 group-hover:text-brand-primary transition-colors">{item.title}</h3>
-                      <p className="text-neutral-400 text-sm leading-relaxed line-clamp-3">
-                        {item.content}
-                      </p>
+                      
+                      <div className="p-8 flex flex-col flex-1">
+                        <div className="text-[10px] text-neutral-500 mb-3 flex items-center gap-2 font-bold uppercase tracking-widest">
+                          <span>{new Date(item.date).toLocaleDateString()}</span>
+                          <span className="w-1 h-1 bg-neutral-700 rounded-full"></span>
+                          <span>Por {item.author}</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-4 group-hover:text-brand-primary transition-colors line-clamp-2 leading-tight">
+                          {item.title}
+                        </h3>
+                        <p className="text-neutral-400 text-sm leading-relaxed line-clamp-3 mb-6 flex-1">
+                          {item.content}
+                        </p>
+                        <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                          <span className="text-xs font-bold text-brand-primary group-hover:translate-x-1 transition-transform inline-flex items-center gap-2">
+                            Leer más <ArrowRight className="w-3 h-3" />
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-12 text-neutral-500">
-                    {t("news_empty")}
+                  <div className="col-span-full text-center py-24 bg-brand-surface/30 rounded-3xl border border-dashed border-white/10">
+                    <Newspaper className="w-12 h-12 text-neutral-700 mx-auto mb-4 opacity-20" />
+                    <p className="text-neutral-500 font-medium">{t("news_empty")}</p>
                   </div>
                 )}
               </div>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User, Video, LogOut, Settings } from "lucide-react";
+import { Mountain, MonitorPlay, Home, Languages, Globe, Users, ShieldCheck, LogIn, User, Video, LogOut, Settings, Newspaper } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { useUser } from "../contexts/UserContext";
 
@@ -12,6 +12,7 @@ export default function Navbar() {
     { path: "/", label: t("nav_home"), icon: Home },
     { path: "/view", label: t("nav_view"), icon: MonitorPlay },
     { path: "/transmitir", label: "Transmitir", icon: Video },
+    { path: "/admin-news", label: "Admin Noticias", icon: Newspaper },
     { path: "/admin-users", label: "Admin Usuarios", icon: Settings },
     { path: "/traductor", label: t("nav_translator"), icon: Languages },
     { path: "/team", label: t("team_title"), icon: Users },

@@ -26,7 +26,12 @@ export default function Auth() {
       navigate(from, { replace: true });
     } catch (err: any) {
       console.error("Google login error:", err);
-      setError("Error al iniciar sesión con Google. Inténtalo de nuevo.");
+      if (err.code === "auth/popup-closed-by-user") {
+        // User closed the popup, don't show a scary error
+        setError(null);
+      } else {
+        setError("Error al iniciar sesión con Google. Inténtalo de nuevo.");
+      }
     } finally {
       setLoading(false);
     }
