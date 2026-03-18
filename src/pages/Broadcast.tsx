@@ -38,7 +38,8 @@ export default function Broadcast() {
 
   useEffect(() => {
     // Initialize Socket.IO once
-    const socket = io();
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+    const socket = io(backendUrl);
     socketRef.current = socket;
 
     socket.on("connect", () => setSocketStatus("connected"));
@@ -89,7 +90,8 @@ export default function Broadcast() {
     const finalStreamName = streamName || user?.name || "Vida Mixe Stream";
 
     try {
-      const response = await fetch('/api/livekit/token', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+      const response = await fetch(`${backendUrl}/api/livekit/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,6 +100,11 @@ export default function Broadcast() {
           isBroadcaster: true
         })
       });
+      
+      if (!response.ok) {
+        throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+      }
+      
       const { token } = await response.json();
 
       const room = new Room();
@@ -120,9 +127,9 @@ export default function Broadcast() {
 
       socketRef.current?.emit("broadcaster", finalStreamName);
       setIsLive(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error starting broadcast:", error);
-      alert("Error al conectar con el servidor de video.");
+      alert(`Error al conectar con el servidor de video: ${error.message || error}`);
     }
   };
 

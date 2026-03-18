@@ -29,7 +29,8 @@ export default function View() {
   const roomRef = useRef<Room | null>(null);
 
   useEffect(() => {
-    const socket = io();
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+    const socket = io(backendUrl);
     socketRef.current = socket;
 
     socket.on("connect", () => setSocketStatus("connected"));
@@ -70,7 +71,8 @@ export default function View() {
     }
 
     try {
-      const response = await fetch('/api/livekit/token', {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+      const response = await fetch(`${backendUrl}/api/livekit/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,6 +81,11 @@ export default function View() {
           isBroadcaster: false
         })
       });
+      
+      if (!response.ok) {
+        throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+      }
+      
       const { token } = await response.json();
 
       const room = new Room();
@@ -91,8 +98,9 @@ export default function View() {
       });
 
       await room.connect('wss://new-app-6tu2ilh8.livekit.cloud', token);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error joining stream:", error);
+      alert(`Error al conectar con el servidor de video: ${error.message || error}`);
     }
   };
 
