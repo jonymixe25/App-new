@@ -31,36 +31,6 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     };
   }, [isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-    const body = isLogin ? { username: email, password } : { username: email, password, name };
-
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        login(data.user);
-        onClose();
-      } else {
-        setError(data.error || "Algo salió mal");
-      }
-    } catch (err) {
-      setError("Error de conexión");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleGoogleAuth = async () => {
     setLoading(true);
     setError(null);
@@ -113,108 +83,32 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               {/* Header */}
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-white mb-2">
-                  {isLogin ? "¡Bienvenido!" : "Crea tu cuenta"}
+                  ¡Bienvenido!
                 </h2>
                 <p className="text-neutral-400 text-sm">
-                  {isLogin 
-                    ? "Ingresa tus credenciales para acceder" 
-                    : "Únete a la comunidad Ayuuk"}
+                  Únete a la comunidad Ayuuk
                 </p>
               </div>
 
-              {/* Tabs */}
-              <div className="flex p-1 bg-brand-bg rounded-xl mb-8 border border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setIsLogin(true)}
-                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                    isLogin ? "bg-brand-primary text-white shadow-lg" : "text-neutral-500 hover:text-neutral-300"
-                  }`}
-                >
-                  Acceso
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsLogin(false)}
-                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                    !isLogin ? "bg-brand-primary text-white shadow-lg" : "text-neutral-500 hover:text-neutral-300"
-                  }`}
-                >
-                  Registro
-                </button>
-              </div>
-
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {!isLogin && (
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Nombre completo"
-                      className="w-full bg-brand-bg border border-white/5 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                    />
+              <div className="space-y-4">
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-sm p-3 rounded-xl text-center">
+                    {error}
                   </div>
                 )}
 
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Usuario o Correo"
-                    className="w-full bg-brand-bg border border-white/5 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                  />
-                </div>
-
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Contraseña"
-                    className="w-full bg-brand-bg border border-white/5 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                  />
-                </div>
-
-                {error && <p className="text-red-500 text-xs text-center">{error}</p>}
-
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-brand-primary hover:bg-brand-primary/80 disabled:opacity-50 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-2 group"
-                >
-                  {loading ? "Cargando..." : (isLogin ? "Entrar" : "Registrarse")}
-                  {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
-                </button>
-              </form>
-
-              {/* Divider */}
-              <div className="relative my-8">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/5"></div>
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-brand-surface px-2 text-neutral-500">O continúa con</span>
-                </div>
-              </div>
-
-              {/* Social Auth */}
-              <div className="grid grid-cols-1 gap-4">
-                <button 
                   onClick={handleGoogleAuth}
                   disabled={loading}
-                  className="flex items-center justify-center gap-2 py-3 bg-brand-bg border border-white/5 rounded-xl text-sm font-medium text-neutral-300 hover:bg-white/5 transition-all disabled:opacity-50"
+                  className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-neutral-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-lg shadow-white/10"
                 >
-                  <Chrome className="w-4 h-4" />
-                  Google
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                  ) : (
+                    <Chrome className="w-5 h-5" />
+                  )}
+                  Continuar con Google
                 </button>
               </div>
             </div>

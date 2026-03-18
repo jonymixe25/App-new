@@ -1,9 +1,11 @@
 import { Helmet } from "react-helmet-async";
-import { Users, Mail, Heart, Camera, Music, Code, Mic2, Plus, Pencil, Trash2, X, Save, Loader2, Upload } from "lucide-react";
+import { Users, Mail, Heart, Camera, Music, Code, Mic2, Loader2 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { useLanguage } from "../context/LanguageContext";
+import { db } from "../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 
 export interface TeamMember {
   id: string;
@@ -28,118 +30,29 @@ const ROLE_ICONS: Record<string, any> = {
 export default function Team() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentMember, setCurrentMember] = useState<Partial<TeamMember> | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useLanguage();
 
-  // Simple admin check based on localStorage or prompt for now, 
-  // since this page has an edit feature. We can just use a password prompt.
-  const [isAdmin, setIsAdmin] = useState(false);
-
   useEffect(() => {
-    const checkAdmin = () => {
-      const storedPassword = localStorage.getItem("adminPassword");
-      if (storedPassword === "mixe2024") {
-        setIsAdmin(true);
-      }
-    };
-    checkAdmin();
-    fetchTeam();
-  }, []);
-
-  const fetchTeam = async () => {
-    try {
-      const res = await fetch("/api/team");
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data);
-      }
-    } catch (error) {
-      console.error("Error fetching team:", error);
-    } finally {
+    const unsubscribe = onSnapshot(collection(db, "team"), (snapshot) => {
+      const teamData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as TeamMember[];
+      setMembers(teamData);
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      console.error("Error fetching team:", error);
+      setLoading(false);
+    });
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentMember?.name || !currentMember?.role || !currentMember?.email) return;
-
-    const password = localStorage.getItem("adminPassword") || prompt("Contraseña de administrador:");
-    if (password !== "mixe2024") {
-      alert("Contraseña incorrecta");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const memberData = {
-        name: currentMember.name,
-        role: currentMember.role,
-        email: currentMember.email,
-        bio: currentMember.bio || "",
-        image: currentMember.image || "",
-        icon: "Users" // default icon
-      };
-
-      // Since the backend only has POST for adding and DELETE for removing,
-      // we'll just add a new one and delete the old one if editing, or just add.
-      // Wait, let's check if there's an update endpoint.
-      // If not, we'll just use POST to add.
-      if (currentMember.id) {
-        // Delete old
-        await fetch(`/api/team/${currentMember.id}?password=${password}`, { method: "DELETE" });
-      }
-
-      const res = await fetch("/api/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...memberData, password })
-      });
-
-      if (res.ok) {
-        await fetchTeam();
-        setIsEditing(false);
-        setCurrentMember(null);
-      } else {
-        alert("Error al guardar el miembro");
-      }
-    } catch (error) {
-      console.error("Error saving member:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("¿Estás seguro de eliminar a este miembro?")) return;
-    
-    const password = localStorage.getItem("adminPassword") || prompt("Contraseña de administrador:");
-    if (password !== "mixe2024") {
-      alert("Contraseña incorrecta");
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/team/${id}?password=${password}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        await fetchTeam();
-      } else {
-        alert("Error al eliminar");
-      }
-    } catch (error) {
-      console.error("Error deleting member:", error);
-    }
-  };
+    return () => unsubscribe();
+  }, []);
 
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-brand-bg text-neutral-50 font-sans">
         <Helmet>
-          <title>{t.team.title} | Vida Mixe TV</title>
+          <title>{t("team_title")} | Vida Mixe TV</title>
           <meta name="description" content="Conoce a las personas detrás de Vida Mixe TV, trabajando para difundir la cultura Ayuuk." />
         </Helmet>
 
@@ -161,24 +74,11 @@ export default function Team() {
               <span className="text-sm font-medium tracking-wide uppercase">Gente de las Nubes</span>
             </div>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white">
-              {t.team.title.split(' ')[0]} <span className="text-brand-primary">{t.team.title.split(' ')[1]}</span>
+              {t("team_title").split(' ')[0]} <span className="text-brand-primary">{t("team_title").split(' ')[1]}</span>
             </h1>
             <p className="text-xl text-neutral-400 font-light leading-relaxed">
-              {t.team.subtitle}
+              {t("team_subtitle")}
             </p>
-
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  setCurrentMember({ name: "", role: "", email: "", bio: "", image: "" });
-                  setIsEditing(true);
-                }}
-                className="mt-8 inline-flex items-center gap-2 px-6 py-3 bg-brand-primary text-white rounded-full font-bold hover:bg-brand-primary/80 transition-all shadow-lg shadow-brand-primary/20"
-              >
-                <Plus className="w-5 h-5" />
-                {t.team.addMember}
-              </button>
-            )}
           </div>
         </div>
 
@@ -201,26 +101,6 @@ export default function Team() {
                     key={member.id} 
                     className="bg-brand-surface border border-white/5 rounded-3xl overflow-hidden group hover:border-brand-primary/30 transition-all duration-500 relative"
                   >
-                    {isAdmin && (
-                      <div className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => {
-                            setCurrentMember(member);
-                            setIsEditing(true);
-                          }}
-                          className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-brand-primary transition-colors"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => member.id && handleDelete(member.id)}
-                          className="p-2 bg-white/10 backdrop-blur-md rounded-full text-white hover:bg-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-
                     <div className="relative aspect-square overflow-hidden">
                       <img 
                         src={member.image || `https://picsum.photos/seed/${member.name}/400/400`} 
@@ -273,146 +153,6 @@ export default function Team() {
             </div>
           </div>
         </div>
-
-        {/* Edit Modal */}
-        <AnimatePresence>
-          {isEditing && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsEditing(false)}
-                className="absolute inset-0 bg-brand-bg/90 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="relative w-full max-w-lg bg-brand-surface border border-white/10 rounded-[2rem] p-8 shadow-2xl"
-              >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-bold text-white">
-                    {currentMember?.id ? "Editar Miembro" : "Nuevo Miembro"}
-                  </h2>
-                  <button onClick={() => setIsEditing(false)} className="text-neutral-500 hover:text-white">
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSave} className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Nombre Completo</label>
-                    <input
-                      required
-                      type="text"
-                      value={currentMember?.name || ""}
-                      onChange={e => setCurrentMember(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all"
-                      placeholder="Ej. Juan Pérez"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Rol / Puesto</label>
-                    <select
-                      required
-                      value={currentMember?.role || ""}
-                      onChange={e => setCurrentMember(prev => ({ ...prev, role: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all"
-                    >
-                      <option value="" disabled className="bg-brand-surface">Seleccionar rol</option>
-                      {Object.keys(ROLE_ICONS).map(role => (
-                        <option key={role} value={role} className="bg-brand-surface">{role}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Correo Electrónico</label>
-                    <input
-                      required
-                      type="email"
-                      value={currentMember?.email || ""}
-                      onChange={e => setCurrentMember(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all"
-                      placeholder="correo@vidamixe.tv"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Biografía Corta</label>
-                    <textarea
-                      value={currentMember?.bio || ""}
-                      onChange={e => setCurrentMember(prev => ({ ...prev, bio: e.target.value }))}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-brand-primary outline-none transition-all resize-none h-24"
-                      placeholder="Breve descripción del miembro..."
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <label className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Foto de Perfil</label>
-                    <div className="flex items-center gap-6">
-                      <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-white/5 border border-white/10 group">
-                        <img
-                          src={currentMember?.image || `https://picsum.photos/seed/${currentMember?.name || 'preview'}/200/200`}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                        <label className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                          <Upload className="w-6 h-6 text-white" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setCurrentMember(prev => ({ ...prev, image: reader.result as string }));
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <input
-                          type="url"
-                          value={currentMember?.image || ""}
-                          onChange={e => setCurrentMember(prev => ({ ...prev, image: e.target.value }))}
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:border-brand-primary outline-none transition-all"
-                          placeholder="O pega una URL de imagen..."
-                        />
-                        <p className="text-[10px] text-neutral-500">Puedes subir un archivo o pegar un enlace directo.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditing(false)}
-                      className="flex-1 px-6 py-3 rounded-xl border border-white/10 text-white font-bold hover:bg-white/5 transition-all"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="flex-1 px-6 py-3 rounded-xl bg-brand-primary text-white font-bold hover:bg-brand-primary/80 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                      Guardar
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </ErrorBoundary>
   );
