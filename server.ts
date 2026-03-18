@@ -17,7 +17,13 @@ async function startServer() {
   
   const io = new Server(httpServer, {
     cors: {
-      origin: ["https://vidamixe.mx", "https://www.vidamixe.mx", "http://localhost:3000", "*"],
+      origin: [
+        "https://vidamixe.mx", 
+        "https://www.vidamixe.mx", 
+        "https://app-new-production-1af2.up.railway.app",
+        "http://localhost:3000", 
+        "*"
+      ],
       methods: ["GET", "POST"]
     },
     pingTimeout: 60000,
