@@ -1,5 +1,5 @@
 import { Helmet } from "react-helmet-async";
-import { Users, Mail, Heart, Camera, Music, Code, Mic2, Loader2 } from "lucide-react";
+import { Users, Mail, Heart, Camera, Music, Code, Mic2, Loader2, Linkedin, Twitter, Github } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -15,6 +15,9 @@ export interface TeamMember {
   bio?: string;
   image?: string;
   icon?: string;
+  linkedin?: string;
+  twitter?: string;
+  github?: string;
   createdAt?: string;
 }
 
@@ -145,6 +148,21 @@ export default function Team() {
                         <a href={`mailto:${member.email}`} className="text-neutral-500 hover:text-white transition-colors">
                           <Mail className="w-5 h-5" />
                         </a>
+                        {member.linkedin && (
+                          <a href={member.linkedin} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-white transition-colors">
+                            <Linkedin className="w-5 h-5" />
+                          </a>
+                        )}
+                        {member.twitter && (
+                          <a href={member.twitter} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-white transition-colors">
+                            <Twitter className="w-5 h-5" />
+                          </a>
+                        )}
+                        {member.github && (
+                          <a href={member.github} target="_blank" rel="noopener noreferrer" className="text-neutral-500 hover:text-white transition-colors">
+                            <Github className="w-5 h-5" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   </motion.div>

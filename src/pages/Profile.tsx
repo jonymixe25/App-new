@@ -1,7 +1,8 @@
 import React from "react";
 import { motion } from "motion/react";
 import { useUser } from "../contexts/UserContext";
-import { User, ShieldCheck, Mail, Calendar, LogOut } from "lucide-react";
+import { User, ShieldCheck, Mail, Calendar, LogOut, Video, Settings } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Profile() {
   const { user, logout } = useUser();
@@ -16,7 +17,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-brand-bg text-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -64,6 +65,31 @@ export default function Profile() {
                 Cerrar Sesión
               </button>
             </div>
+
+            {user.role === 'admin' && (
+              <div className="mt-8 p-6 bg-brand-primary/5 border border-brand-primary/20 rounded-2xl">
+                <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-brand-primary" />
+                  Panel de Control
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Link 
+                    to="/transmitir"
+                    className="flex items-center justify-center gap-2 bg-brand-primary hover:bg-brand-primary/80 text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg shadow-brand-primary/20"
+                  >
+                    <Video className="w-5 h-5" />
+                    Iniciar Transmisión
+                  </Link>
+                  <Link 
+                    to="/admin-news"
+                    className="flex items-center justify-center gap-2 bg-brand-surface hover:bg-white/10 border border-white/10 text-white font-semibold py-3 px-4 rounded-xl transition-all"
+                  >
+                    <Settings className="w-5 h-5" />
+                    Gestionar Contenido
+                  </Link>
+                </div>
+              </div>
+            )}
 
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">

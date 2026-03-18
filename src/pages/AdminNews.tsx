@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Save, Trash2, Plus, Lock, Newspaper, User, FileText, Video, Image as ImageIcon, DollarSign, Link as LinkIcon, ShieldAlert, Loader2, Users } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Plus, Lock, Newspaper, User, FileText, Video, Image as ImageIcon, DollarSign, Link as LinkIcon, ShieldAlert, Loader2, Users, Linkedin, Twitter, Github, Mail } from "lucide-react";
 import { moderateContent } from "../services/moderationService";
 import { db, auth } from "../firebase";
 import { collection, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
@@ -340,7 +340,14 @@ export default function AdminNews() {
             <h1 className="text-3xl font-bold text-white">Panel de Administración</h1>
           </div>
           <div className="flex items-center gap-4">
-            {userEmail && <span className="text-sm text-neutral-400">{userEmail}</span>}
+            <Link 
+              to="/transmitir"
+              className="flex items-center gap-2 px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-primary/20"
+            >
+              <Video className="w-4 h-4" />
+              Transmitir
+            </Link>
+            {userEmail && <span className="text-sm text-neutral-400 hidden sm:inline">{userEmail}</span>}
             <button onClick={handleLogout} className="text-sm text-red-400 hover:text-red-300">Cerrar Sesión</button>
           </div>
         </div>
@@ -781,6 +788,12 @@ export default function AdminNews() {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-base font-bold text-white truncate group-hover:text-brand-primary transition-colors">{member.name}</h3>
                       <p className="text-brand-secondary text-xs font-medium uppercase tracking-wider">{member.role}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {member.email && <Mail className="w-3 h-3 text-neutral-500" />}
+                        {member.linkedin && <Linkedin className="w-3 h-3 text-neutral-500" />}
+                        {member.twitter && <Twitter className="w-3 h-3 text-neutral-500" />}
+                        {member.github && <Github className="w-3 h-3 text-neutral-500" />}
+                      </div>
                     </div>
                     <button 
                       onClick={() => handleTeamDelete(member.id)}
