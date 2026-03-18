@@ -3,22 +3,12 @@ import { io, Socket } from "socket.io-client";
 import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
-
-const config = {
-  iceServers: [
-    { urls: ["stun:stun.l.google.com:19302"] },
-    { urls: ["stun:stun1.l.google.com:19302"] },
-    { urls: ["stun:stun2.l.google.com:19302"] },
-    { urls: ["stun:stun3.l.google.com:19302"] },
-    { urls: ["stun:stun4.l.google.com:19302"] }
-  ]
-};
+import Chat from "../components/Chat";
+import { webrtcConfig } from "../utils/webrtcConfig";
 
 export default function View() {
   const [broadcasters, setBroadcasters] = useState<any[]>([]);
   const [selectedBroadcaster, setSelectedBroadcaster] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [newMessage, setNewMessage] = useState("");
   const [viewers, setViewers] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -30,6 +20,7 @@ export default function View() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,6 +31,10 @@ export default function View() {
   useEffect(() => {
     const socket = io();
     socketRef.current = socket;
+
+    socket.on("connect", () => setSocketStatus("connected"));
+    socket.on("disconnect", () => setSocketStatus("disconnected"));
+    socket.on("connect_error", () => setSocketStatus("disconnected"));
 
     socket.on("broadcaster_list", (list: any[]) => {
       setBroadcasters(list);
@@ -53,7 +48,7 @@ export default function View() {
         peerConnection.current.close();
       }
 
-      const pc = new RTCPeerConnection(config);
+      const pc = new RTCPeerConnection(webrtcConfig);
       peerConnection.current = pc;
       
       pc.onicecandidate = (event) => {
@@ -85,10 +80,6 @@ export default function View() {
       }
     });
 
-    socket.on("chat_message", (msg) => {
-      setMessages(prev => [...prev, msg]);
-    });
-
     socket.on("viewers_count", (count: number) => {
       setViewers(count);
     });
@@ -111,7 +102,6 @@ export default function View() {
 
   const joinStream = (broadcaster: any) => {
     setSelectedBroadcaster(broadcaster);
-    setMessages([]);
     socketRef.current?.emit("watcher", broadcaster.id);
   };
 
@@ -126,22 +116,6 @@ export default function View() {
     if (!username.trim()) return;
     socketRef.current?.emit("register_user", username);
     setIsRegistered(true);
-  };
-
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !isRegistered) return;
-
-    const msg = {
-      id: Date.now().toString(),
-      user: username,
-      text: newMessage,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isAdmin: false
-    };
-
-    socketRef.current?.emit("chat_message", msg);
-    setNewMessage("");
   };
 
   const toggleMute = () => {
@@ -395,6 +369,18 @@ export default function View() {
                       <Users className="w-3 h-3 text-brand-primary" />
                       {viewers}
                     </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-bold text-white shadow-xl" title="Estado del Servidor">
+                      <div className={`w-1.5 h-1.5 rounded-full ${socketStatus === 'connected' ? 'bg-emerald-500' : socketStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`} />
+                      <span className="capitalize">{socketStatus === 'connected' ? 'Conectado' : socketStatus === 'connecting' ? 'Conectando...' : 'Desconectado'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-[10px] font-bold text-emerald-400 shadow-xl" title="Calidad de Recepción">
+                      <div className="flex items-end gap-[1px] h-2.5">
+                        <div className="w-0.5 bg-emerald-400 h-1/3 rounded-sm"></div>
+                        <div className="w-0.5 bg-emerald-400 h-2/3 rounded-sm"></div>
+                        <div className="w-0.5 bg-emerald-400 h-full rounded-sm"></div>
+                      </div>
+                      Excelente
+                    </div>
                   </div>
 
                   {/* Big Play/Pause Indicator on Click */}
@@ -486,49 +472,7 @@ export default function View() {
 
             {/* Chat */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4 bg-white/5 flex items-center gap-2 text-xs font-bold text-neutral-400 uppercase tracking-widest">
-                <MessageSquare className="w-4 h-4" />
-                Chat Comunitario
-              </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                <AnimatePresence>
-                  {messages.map((msg) => (
-                    <motion.div 
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      key={msg.id} 
-                      className="space-y-1"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold ${msg.isAdmin ? 'text-brand-primary' : 'text-neutral-400'}`}>
-                          {msg.user}
-                        </span>
-                        <span className="text-[10px] text-neutral-600">{msg.time}</span>
-                      </div>
-                      <p className="text-sm text-neutral-300 bg-white/5 p-3 rounded-2xl rounded-tl-none">
-                        {msg.text}
-                      </p>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-              <form onSubmit={sendMessage} className="p-6 border-t border-white/5">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Escribe un mensaje..."
-                    className="w-full bg-brand-bg border border-white/10 rounded-2xl pl-4 pr-12 py-3 text-sm text-white outline-none focus:border-brand-primary/50 transition-all"
-                  />
-                  <button 
-                    type="submit"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-brand-primary hover:text-brand-primary/80 transition-colors"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                </div>
-              </form>
+              <Chat socket={socketRef.current} isHost={false} />
             </div>
           </div>
         </div>
