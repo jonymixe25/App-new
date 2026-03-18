@@ -312,100 +312,102 @@ export default function Broadcast() {
           )}
 
           {/* Overlay Controls */}
-          <div className="absolute top-6 left-6 flex flex-col gap-3 z-10">
-            <div className="flex items-center gap-4">
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md border ${isLive ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-white/10 border-white/10 text-neutral-400'}`}>
+          <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex flex-col gap-3 z-10 max-w-[calc(100%-2rem)]">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full backdrop-blur-md border ${isLive ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-white/10 border-white/10 text-neutral-400'}`}>
                 <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-neutral-500'}`} />
-                <span className="text-xs font-bold uppercase tracking-widest">{isLive ? 'En Vivo' : 'Offline'}</span>
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">{isLive ? 'En Vivo' : 'Offline'}</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white">
-                <Users className="w-4 h-4" />
-                <span className="text-xs font-bold">{viewers}</span>
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-[10px] sm:text-xs font-bold">{viewers}</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white" title="Estado del Servidor">
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white" title="Estado del Servidor">
                 <div className={`w-2 h-2 rounded-full ${socketStatus === 'connected' ? 'bg-emerald-500' : socketStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-xs font-bold capitalize">{socketStatus === 'connected' ? 'Conectado' : socketStatus === 'connecting' ? 'Conectando...' : 'Desconectado'}</span>
+                <span className="text-[10px] sm:text-xs font-bold capitalize">{socketStatus === 'connected' ? 'Conectado' : socketStatus === 'connecting' ? 'Conectando...' : 'Desconectado'}</span>
               </div>
               {isLive && (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-emerald-400" title="Calidad de Transmisión">
-                  <div className="flex items-end gap-0.5 h-3">
-                    <div className="w-1 bg-emerald-400 h-1/3 rounded-sm"></div>
-                    <div className="w-1 bg-emerald-400 h-2/3 rounded-sm"></div>
-                    <div className="w-1 bg-emerald-400 h-full rounded-sm"></div>
+                <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-emerald-400" title="Calidad de Transmisión">
+                  <div className="flex items-end gap-0.5 h-2 sm:h-3">
+                    <div className="w-0.5 sm:w-1 bg-emerald-400 h-1/3 rounded-sm"></div>
+                    <div className="w-0.5 sm:w-1 bg-emerald-400 h-2/3 rounded-sm"></div>
+                    <div className="w-0.5 sm:w-1 bg-emerald-400 h-full rounded-sm"></div>
                   </div>
-                  <span className="text-xs font-bold">Excelente</span>
+                  <span className="text-[10px] sm:text-xs font-bold">Excelente</span>
                 </div>
               )}
             </div>
             
             {isRecording && (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-600/20 border border-red-500 text-red-500 backdrop-blur-md w-fit">
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-red-600/20 border border-red-500 text-red-500 backdrop-blur-md w-fit">
                 <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-widest">Grabando: {formatTime(recordingTime)}</span>
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Grabando: {formatTime(recordingTime)}</span>
               </div>
             )}
           </div>
 
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 px-8 py-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl z-10">
-            <div className="flex items-center gap-2">
+          <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 px-4 sm:px-8 py-2 sm:py-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl z-10 w-[90%] sm:w-auto justify-center">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button 
                 onClick={toggleMute}
                 disabled={!stream}
-                className={`p-4 rounded-full transition-all disabled:opacity-50 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                className={`p-3 sm:p-4 rounded-full transition-all disabled:opacity-50 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
                 title={isMuted ? "Activar Micrófono" : "Silenciar Micrófono"}
               >
-                {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                {isMuted ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6" />}
               </button>
               <button 
                 onClick={toggleVideo}
                 disabled={!stream}
-                className={`p-4 rounded-full transition-all disabled:opacity-50 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                className={`p-3 sm:p-4 rounded-full transition-all disabled:opacity-50 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
                 title={isVideoOff ? "Activar Cámara" : "Desactivar Cámara"}
               >
-                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
               </button>
             </div>
 
-            <div className="w-px h-8 bg-white/10 mx-2" />
+            <div className="w-px h-6 sm:h-8 bg-white/10 mx-1 sm:mx-2" />
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {!isRecording ? (
                 <button 
                   onClick={startRecording}
                   disabled={!stream}
-                  className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all disabled:opacity-50"
+                  className="p-3 sm:p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all disabled:opacity-50"
                   title="Iniciar Grabación"
                 >
-                  <Circle className="w-6 h-6 fill-red-500 text-red-500" />
+                  <Circle className="w-5 h-5 sm:w-6 sm:h-6 fill-red-500 text-red-500" />
                 </button>
               ) : (
                 <button 
                   onClick={stopRecording}
-                  className="p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all"
+                  className="p-3 sm:p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all"
                   title="Detener Grabación"
                 >
-                  <Square className="w-6 h-6 fill-white" />
+                  <Square className="w-5 h-5 sm:w-6 sm:h-6 fill-white" />
                 </button>
               )}
             </div>
 
-            <div className="w-px h-8 bg-white/10 mx-2" />
+            <div className="w-px h-6 sm:h-8 bg-white/10 mx-1 sm:mx-2" />
 
             {!isLive ? (
               <button 
                 onClick={startBroadcast}
-                className="px-8 py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-brand-primary/20"
+                className="px-4 sm:px-8 py-3 sm:py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-brand-primary/20 text-sm sm:text-base"
               >
-                <Power className="w-5 h-5" />
-                <span>Iniciar Transmisión</span>
+                <Power className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Iniciar Transmisión</span>
+                <span className="sm:hidden">Iniciar</span>
               </button>
             ) : (
               <button 
                 onClick={stopBroadcast}
-                className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-red-600/20"
+                className="px-4 sm:px-8 py-3 sm:py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-red-600/20 text-sm sm:text-base"
               >
-                <Power className="w-5 h-5" />
-                <span>Detener</span>
+                <Power className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Detener Transmisión</span>
+                <span className="sm:hidden">Detener</span>
               </button>
             )}
           </div>

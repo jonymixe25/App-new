@@ -440,7 +440,7 @@ export default function Home() {
             initial={{ y: 100, opacity: 0, scale: 0.9 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 100, opacity: 0, scale: 0.9 }}
-            className="fixed bottom-8 right-8 z-[100] w-80 md:w-[26rem] perspective-1000"
+            className="fixed bottom-24 right-4 sm:bottom-52 sm:right-8 z-[100] w-[calc(100vw-2rem)] sm:w-80 md:w-[26rem] perspective-1000"
           >
             <div className="bg-brand-surface/80 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_50px_100px_rgba(0,0,0,0.5)] overflow-hidden group">
               <div className="relative aspect-video bg-black">

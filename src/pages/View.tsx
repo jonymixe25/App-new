@@ -304,20 +304,20 @@ export default function View() {
                             />
                           </div>
 
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-6">
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-2 sm:gap-6">
                               <button 
                                 onClick={togglePlay} 
-                                className="p-2 text-white hover:text-brand-primary transition-colors"
+                                className="p-1 sm:p-2 text-white hover:text-brand-primary transition-colors"
                               >
-                                {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current" />}
+                                {isPlaying ? <Pause className="w-5 h-5 sm:w-7 sm:h-7 fill-current" /> : <Play className="w-5 h-5 sm:w-7 sm:h-7 fill-current" />}
                               </button>
 
-                              <div className="flex items-center gap-3 group/volume">
-                                <button onClick={toggleMute} className="p-2 text-white hover:text-brand-primary transition-colors">
-                                  {isMuted || volume === 0 ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                              <div className="flex items-center gap-1 sm:gap-3 group/volume">
+                                <button onClick={toggleMute} className="p-1 sm:p-2 text-white hover:text-brand-primary transition-colors">
+                                  {isMuted || volume === 0 ? <VolumeX className="w-4 h-4 sm:w-6 sm:h-6" /> : <Volume2 className="w-4 h-4 sm:w-6 sm:h-6" />}
                                 </button>
-                                <div className="w-0 group-hover/volume:w-24 overflow-hidden transition-all duration-300 flex items-center">
+                                <div className="w-0 group-hover/volume:w-16 sm:group-hover/volume:w-24 overflow-hidden transition-all duration-300 flex items-center">
                                   <input 
                                     type="range"
                                     min="0"
@@ -330,26 +330,26 @@ export default function View() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-3 text-xs font-bold text-white/80 tabular-nums">
+                              <div className="flex items-center gap-1 sm:gap-3 text-[10px] sm:text-xs font-bold text-white/80 tabular-nums">
                                 <span>{formatTime(currentTime)}</span>
                                 <span className="text-white/30">/</span>
                                 <span>{duration > 0 ? formatTime(duration) : "LIVE"}</span>
                               </div>
 
-                              <button onClick={reconnect} className="p-2 text-white hover:text-brand-primary transition-colors" title="Reconectar">
-                                <RefreshCw className="w-5 h-5" />
+                              <button onClick={reconnect} className="p-1 sm:p-2 text-white hover:text-brand-primary transition-colors" title="Reconectar">
+                                <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
                               </button>
                             </div>
 
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 sm:gap-4">
                               <div className="hidden md:block text-sm font-bold text-white/60 tracking-tight">
                                 {selectedBroadcaster.name}
                               </div>
                               <button 
                                 onClick={toggleFullscreen}
-                                className="p-2 text-white hover:text-brand-primary transition-colors"
+                                className="p-1 sm:p-2 text-white hover:text-brand-primary transition-colors"
                               >
-                                {isFullscreen ? <Minimize2 className="w-6 h-6" /> : <Maximize2 className="w-6 h-6" />}
+                                {isFullscreen ? <Minimize2 className="w-4 h-4 sm:w-6 sm:h-6" /> : <Maximize2 className="w-4 h-4 sm:w-6 sm:h-6" />}
                               </button>
                             </div>
                           </div>

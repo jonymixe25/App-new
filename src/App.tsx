@@ -13,6 +13,7 @@ import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ProtectedRoute from "./components/ProtectedRoute";
+import MusicPlayer from "./components/MusicPlayer";
 
 export default function App() {
   return (
@@ -57,6 +58,7 @@ export default function App() {
                 } />
               </Routes>
             </main>
+            <MusicPlayer />
             <Footer />
           </div>
         </BrowserRouter>

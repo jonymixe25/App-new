@@ -332,14 +332,14 @@ export default function AdminNews() {
       </Helmet>
 
       <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="flex items-center justify-between mb-12">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-12 gap-6">
           <div className="flex items-center gap-4">
-            <Link to="/" className="p-2 hover:bg-brand-surface rounded-full transition-colors text-neutral-400">
+            <Link to="/" className="p-2 hover:bg-brand-surface rounded-full transition-colors text-neutral-400 shrink-0">
               <ArrowLeft className="w-6 h-6" />
             </Link>
-            <h1 className="text-3xl font-bold text-white">Panel de Administración</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Panel de Administración</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <Link 
               to="/transmitir"
               className="flex items-center gap-2 px-4 py-2 bg-brand-primary hover:bg-brand-primary/80 text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-brand-primary/20"
@@ -351,23 +351,23 @@ export default function AdminNews() {
             <button onClick={handleLogout} className="text-sm text-red-400 hover:text-red-300">Cerrar Sesión</button>
           </div>
         </div>
-        <div className="flex items-center justify-between mb-12">
-          <div className="flex bg-brand-surface p-1 rounded-xl border border-white/5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-12 gap-4">
+          <div className="flex bg-brand-surface p-1 rounded-xl border border-white/5 w-full sm:w-auto overflow-x-auto">
             <button 
               onClick={() => setActiveTab("news")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "news" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === "news" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
             >
               Noticias
             </button>
             <button 
               onClick={() => setActiveTab("videos")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "videos" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === "videos" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
             >
               Videos
             </button>
             <button 
               onClick={() => setActiveTab("team")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === "team" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === "team" ? "bg-brand-primary text-white" : "text-neutral-500 hover:text-neutral-300"}`}
             >
               Equipo
             </button>
