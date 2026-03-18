@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { X, Mail, Lock, User, ArrowRight, Chrome } from "lucide-react";
 import { useUser } from "../contexts/UserContext";
 import { loginWithGoogle } from "../firebase";
+import { useNavigate } from "react-router-dom";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [loading, setLoading] = useState(false);
   
   const { login } = useUser();
+  const navigate = useNavigate();
 
   // Prevent scrolling when modal is open
   useEffect(() => {
@@ -37,6 +39,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       await loginWithGoogle();
       onClose();
+      navigate('/profile');
     } catch (err: any) {
       if (err.code === "auth/popup-closed-by-user") {
         // User closed the popup, don't show a scary error or log it as an error

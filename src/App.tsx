@@ -9,6 +9,7 @@ import AdminNews from "./pages/AdminNews";
 import Translator from "./pages/Translator";
 import Team from "./pages/Team";
 import Auth from "./pages/Auth";
+import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -35,6 +36,11 @@ export default function App() {
                 <Route path="/traductor" element={<Translator />} />
                 <Route path="/team" element={<Team />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
                 <Route path="*" element={
                   <div className="min-h-screen flex items-center justify-center bg-brand-bg text-white p-6 text-center">
                     <div className="space-y-6">

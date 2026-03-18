@@ -38,7 +38,18 @@ export default function Team() {
         id: doc.id,
         ...doc.data()
       })) as TeamMember[];
-      setMembers(teamData);
+      
+      if (teamData.length === 0) {
+        setMembers([{
+          id: 'default-1',
+          name: 'Jonatan García Díaz',
+          role: 'Director General',
+          email: 'mixecultura25@gmail.com',
+          bio: 'Parte fundamental de nuestro equipo, trabajando para llevar nuestra cultura a más personas.'
+        }]);
+      } else {
+        setMembers(teamData);
+      }
       setLoading(false);
     }, (error) => {
       console.error("Error fetching team:", error);

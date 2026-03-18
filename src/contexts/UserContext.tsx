@@ -8,6 +8,7 @@ interface User {
   name: string;
   photoUrl?: string;
   isFirebase?: boolean;
+  role?: 'admin' | 'user';
 }
 
 interface UserContextType {
@@ -31,12 +32,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     const currentUser = auth.currentUser;
     if (currentUser) {
-      const userData = {
+      const email = currentUser.email || "";
+      const role = email === 'mixecultura25@gmail.com' ? 'admin' : 'user';
+      
+      const userData: User = {
         id: currentUser.uid,
-        email: currentUser.email || "",
-        name: currentUser.displayName || currentUser.email?.split('@')[0] || "Usuario",
+        email: email,
+        name: currentUser.displayName || email.split('@')[0] || "Usuario",
         photoUrl: currentUser.photoURL || undefined,
-        isFirebase: true
+        isFirebase: true,
+        role
       };
       setUser(userData);
       localStorage.setItem("broadcaster_user", JSON.stringify(userData));
@@ -47,12 +52,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        const userData = {
+        const email = firebaseUser.email || "";
+        const role = email === 'mixecultura25@gmail.com' ? 'admin' : 'user';
+        
+        const userData: User = {
           id: firebaseUser.uid,
-          email: firebaseUser.email || "",
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuario",
+          email: email,
+          name: firebaseUser.displayName || email.split('@')[0] || "Usuario",
           photoUrl: firebaseUser.photoURL || undefined,
-          isFirebase: true
+          isFirebase: true,
+          role
         };
         setUser(userData);
         localStorage.setItem("broadcaster_user", JSON.stringify(userData));

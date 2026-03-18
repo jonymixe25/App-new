@@ -14,12 +14,18 @@ export default function Auth() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         // Store user in localStorage for backwards compatibility with existing components
+        const email = user.email || "";
+        const role = email === 'mixecultura25@gmail.com' ? 'admin' : 'user';
         localStorage.setItem("broadcaster_user", JSON.stringify({
           id: user.uid,
-          username: user.email?.split('@')[0] || "User",
-          name: user.displayName || "User"
+          email: email,
+          username: email.split('@')[0] || "User",
+          name: user.displayName || "User",
+          photoUrl: user.photoURL || undefined,
+          isFirebase: true,
+          role
         }));
-        navigate("/admin");
+        navigate("/profile");
       }
     });
     return () => unsubscribe();

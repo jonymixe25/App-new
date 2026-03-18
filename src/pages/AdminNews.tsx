@@ -48,12 +48,12 @@ export default function AdminNews() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
+      if (user && user.email === 'mixecultura25@gmail.com') {
         setIsAuthorized(true);
         setUserEmail(user.email);
       } else {
         setIsAuthorized(false);
-        setUserEmail(null);
+        setUserEmail(user?.email || null);
       }
     });
     return () => unsubscribe();
@@ -119,6 +119,45 @@ export default function AdminNews() {
   const [tTwitter, setTTwitter] = useState("");
   const [tGithub, setTGithub] = useState("");
   const [tEmail, setTEmail] = useState("");
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 400;
+        const MAX_HEIGHT = 400;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setTImage(dataUrl);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -631,15 +670,29 @@ export default function AdminNews() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">URL Imagen</label>
-                    <input 
-                      type="url"
-                      required
-                      value={tImage}
-                      onChange={(e) => setTImage(e.target.value)}
-                      placeholder="https://picsum.photos/..."
-                      className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
-                    />
+                    <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Foto de Perfil</label>
+                    <div className="flex items-center gap-4">
+                      {tImage && (
+                        <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-brand-bg border border-white/10">
+                          <img src={tImage} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex-1 space-y-2">
+                        <input 
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="w-full text-sm text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-brand-primary/20 file:text-brand-primary hover:file:bg-brand-primary/30 transition-all cursor-pointer"
+                        />
+                        <input 
+                          type="text"
+                          value={tImage}
+                          onChange={(e) => setTImage(e.target.value)}
+                          placeholder="O pega una URL de imagen..."
+                          className="w-full bg-brand-bg border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-brand-primary/50 transition-all"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">

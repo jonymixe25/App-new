@@ -73,7 +73,7 @@ export default function Navbar() {
               {!loading && (
                 user ? (
                   <>
-                    <Link to="/transmitir" className="flex items-center gap-2 group">
+                    <Link to="/profile" className="flex items-center gap-2 group">
                       <div className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50 group-hover:border-brand-primary transition-all">
                         {user.photoUrl ? (
                           <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -111,7 +111,7 @@ export default function Navbar() {
           {/* Mobile Navigation (Simple Icons) */}
           <div className="flex md:hidden items-center gap-2">
             {user ? (
-              <Link to="/transmitir" className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50">
+              <Link to="/profile" className="w-8 h-8 rounded-full overflow-hidden border border-brand-primary/50">
                 {user.photoUrl ? (
                   <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
