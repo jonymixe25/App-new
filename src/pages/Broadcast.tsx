@@ -131,6 +131,12 @@ export default function Broadcast() {
     streamRef.current = stream;
   }, [stream]);
 
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, isLive]);
+
   const startBroadcast = async () => {
     let currentStream = stream;
     if (!currentStream) {
@@ -156,9 +162,6 @@ export default function Broadcast() {
       setStream(mediaStream);
       streamRef.current = mediaStream;
       setHasPermissions(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
       return mediaStream;
     } catch (err) {
       console.error("Error accessing media devices:", err);
