@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { Room, RoomEvent, Track } from "livekit-client";
 import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
@@ -26,7 +27,7 @@ export default function View() {
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<Socket | null>(null);
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
+  const roomRef = useRef<Room | null>(null);
 
   useEffect(() => {
     const socket = io();
@@ -42,72 +43,63 @@ export default function View() {
 
     socket.emit("get_broadcasters");
 
-    socket.on("offer", (id: string, description: RTCSessionDescriptionInit) => {
-      // Close existing connection if any
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
-
-      const pc = new RTCPeerConnection(webrtcConfig);
-      peerConnection.current = pc;
-      
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("candidate", id, event.candidate);
-        }
-      };
-
-      pc.ontrack = (event) => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      pc.setRemoteDescription(description)
-        .then(() => pc.createAnswer())
-        .then(sdp => pc.setLocalDescription(sdp))
-        .then(() => {
-          socket.emit("answer", id, pc.localDescription);
-        })
-        .catch(err => console.error("Error handling offer:", err));
-    });
-
-    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      if (peerConnection.current) {
-        peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
-          console.error("Error adding ice candidate:", err);
-        });
-      }
-    });
-
     socket.on("viewers_count", (count: number) => {
       setViewers(count);
     });
 
     socket.on("disconnectPeer", () => {
-      if (videoRef.current) videoRef.current.srcObject = null;
-      if (peerConnection.current) {
-        peerConnection.current.close();
-        peerConnection.current = null;
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
       }
     });
 
     return () => {
       socket.disconnect();
-      if (peerConnection.current) {
-        peerConnection.current.close();
+      if (roomRef.current) {
+        roomRef.current.disconnect();
       }
     };
   }, []);
 
-  const joinStream = (broadcaster: any) => {
+  const joinStream = async (broadcaster: any) => {
     setSelectedBroadcaster(broadcaster);
     socketRef.current?.emit("watcher", broadcaster.id);
+
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+    }
+
+    try {
+      const response = await fetch('/api/livekit/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: broadcaster.name,
+          participantName: username || `Espectador-${Math.floor(Math.random() * 1000)}`,
+          isBroadcaster: false
+        })
+      });
+      const { token } = await response.json();
+
+      const room = new Room();
+      roomRef.current = room;
+
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        if (videoRef.current) {
+          track.attach(videoRef.current);
+        }
+      });
+
+      await room.connect('wss://new-app-6tu2ilh8.livekit.cloud', token);
+    } catch (error) {
+      console.error("Error joining stream:", error);
+    }
   };
 
   const reconnect = () => {
     if (selectedBroadcaster) {
-      socketRef.current?.emit("watcher", selectedBroadcaster.id);
+      joinStream(selectedBroadcaster);
     }
   };
 

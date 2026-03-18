@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
+import { Room, LocalVideoTrack, LocalAudioTrack } from "livekit-client";
 import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useUser } from "../contexts/UserContext";
@@ -22,7 +23,9 @@ export default function Broadcast() {
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const socketRef = useRef<Socket | null>(null);
-  const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
+  const roomRef = useRef<Room | null>(null);
+  const localVideoTrackRef = useRef<LocalVideoTrack | null>(null);
+  const localAudioTrackRef = useRef<LocalAudioTrack | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -43,75 +46,24 @@ export default function Broadcast() {
     socket.on("disconnect", () => setSocketStatus("disconnected"));
     socket.on("connect_error", () => setSocketStatus("disconnected"));
 
-    socket.on("watcher", (id: string) => {
-      const peerConnection = new RTCPeerConnection(webrtcConfig);
-      peerConnections.current[id] = peerConnection;
-
-      // Add tracks from current stream if it exists
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          peerConnection.addTrack(track, streamRef.current!);
-        });
-      }
-
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit("candidate", id, event.candidate);
-        }
-      };
-
-      peerConnection.onnegotiationneeded = async () => {
-        try {
-          const offer = await peerConnection.createOffer();
-          await peerConnection.setLocalDescription(offer);
-          socket.emit("offer", id, peerConnection.localDescription);
-        } catch (err) {
-          console.error("Negotiation error:", err);
-        }
-      };
-
-      peerConnection
-        .createOffer()
-        .then(sdp => peerConnection.setLocalDescription(sdp))
-        .then(() => {
-          socket.emit("offer", id, peerConnection.localDescription);
-        })
-        .catch(err => console.error("Error creating offer:", err));
-    });
-
-    socket.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
-      if (peerConnections.current[id]) {
-        peerConnections.current[id].setRemoteDescription(description).catch(err => {
-          console.error("Error setting remote description:", err);
-        });
-      }
-    });
-
-    socket.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      if (peerConnections.current[id]) {
-        peerConnections.current[id].addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
-          console.error("Error adding ice candidate:", err);
-        });
-      }
-    });
-
-    socket.on("disconnectPeer", (id: string) => {
-      if (peerConnections.current[id]) {
-        peerConnections.current[id].close();
-        delete peerConnections.current[id];
-      }
-    });
-
     socket.on("viewers_count", (count: number) => {
       setViewers(count);
     });
 
     return () => {
       socket.disconnect();
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+      }
+      if (localVideoTrackRef.current) {
+        localVideoTrackRef.current.stop();
+      }
+      if (localAudioTrackRef.current) {
+        localAudioTrackRef.current.stop();
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      Object.values(peerConnections.current).forEach(pc => pc.close());
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []); // Only run once on mount
@@ -135,8 +87,44 @@ export default function Broadcast() {
       if (!currentStream) return;
     }
     
-    socketRef.current?.emit("broadcaster", streamName || user?.name || "Vida Mixe Stream");
-    setIsLive(true);
+    const finalStreamName = streamName || user?.name || "Vida Mixe Stream";
+
+    try {
+      const response = await fetch('/api/livekit/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: finalStreamName,
+          participantName: user?.name || "Locutor",
+          isBroadcaster: true
+        })
+      });
+      const { token } = await response.json();
+
+      const room = new Room();
+      roomRef.current = room;
+      await room.connect('wss://new-app-6tu2ilh8.livekit.cloud', token);
+
+      const videoTrack = currentStream.getVideoTracks()[0];
+      const audioTrack = currentStream.getAudioTracks()[0];
+
+      if (videoTrack) {
+        const lvt = new LocalVideoTrack(videoTrack);
+        localVideoTrackRef.current = lvt;
+        await room.localParticipant.publishTrack(lvt);
+      }
+      if (audioTrack) {
+        const lat = new LocalAudioTrack(audioTrack);
+        localAudioTrackRef.current = lat;
+        await room.localParticipant.publishTrack(lat);
+      }
+
+      socketRef.current?.emit("broadcaster", finalStreamName);
+      setIsLive(true);
+    } catch (error) {
+      console.error("Error starting broadcast:", error);
+      alert("Error al conectar con el servidor de video.");
+    }
   };
 
   const requestPermissions = async () => {
@@ -163,30 +151,59 @@ export default function Broadcast() {
 
   const stopBroadcast = () => {
     if (isRecording) stopRecording();
+    
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+    if (localVideoTrackRef.current) {
+      localVideoTrackRef.current.stop();
+      localVideoTrackRef.current = null;
+    }
+    if (localAudioTrackRef.current) {
+      localAudioTrackRef.current.stop();
+      localAudioTrackRef.current = null;
+    }
+
     stream?.getTracks().forEach(track => track.stop());
     setStream(null);
     setIsLive(false);
     socketRef.current?.emit("stop_broadcasting");
+    
+    // Refresh permissions to get local stream back for preview
+    requestPermissions();
   };
 
   const toggleMute = () => {
-    if (stream) {
+    if (localAudioTrackRef.current) {
+      if (isMuted) {
+        localAudioTrackRef.current.unmute();
+      } else {
+        localAudioTrackRef.current.mute();
+      }
+    } else if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        setIsMuted(!audioTrack.enabled);
       }
     }
+    setIsMuted(!isMuted);
   };
 
   const toggleVideo = () => {
-    if (stream) {
+    if (localVideoTrackRef.current) {
+      if (isVideoOff) {
+        localVideoTrackRef.current.unmute();
+      } else {
+        localVideoTrackRef.current.mute();
+      }
+    } else if (stream) {
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
-        setIsVideoOff(!videoTrack.enabled);
       }
     }
+    setIsVideoOff(!isVideoOff);
   };
 
   const startRecording = () => {

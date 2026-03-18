@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
+import { AccessToken } from "livekit-server-sdk";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,32 +86,6 @@ async function startServer() {
       }
     });
 
-    // Señalización para Broadcast (Uno a Muchos)
-    socket.on("offer", (id, message) => {
-      socket.to(id).emit("offer", socket.id, message);
-    });
-
-    socket.on("answer", (id, message) => {
-      socket.to(id).emit("answer", socket.id, message);
-    });
-
-    socket.on("candidate", (id, message) => {
-      socket.to(id).emit("candidate", socket.id, message);
-    });
-
-    // Señalización para Llamada Privada (Bidireccional)
-    socket.on("private_offer", (targetId, description) => {
-      socket.to(targetId).emit("private_offer", socket.id, description);
-    });
-
-    socket.on("private_answer", (targetId, description) => {
-      socket.to(targetId).emit("private_answer", socket.id, description);
-    });
-
-    socket.on("private_candidate", (targetId, candidate) => {
-      socket.to(targetId).emit("private_candidate", socket.id, candidate);
-    });
-
     socket.on("disconnect", () => {
       // Eliminar usuario de la lista
       if (users[socket.id]) {
@@ -137,6 +112,31 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     console.log("GET /api/health");
     res.json({ status: "ok" });
+  });
+
+  app.post("/api/livekit/token", async (req, res) => {
+    try {
+      const { roomName, participantName, isBroadcaster } = req.body;
+      const apiKey = process.env.LIVEKIT_API_KEY || 'APISBhav5rpQHrE';
+      const apiSecret = process.env.LIVEKIT_API_SECRET || 'eJnJBce2ysaavhaIJALPN10WfFFA6UqCfY9OJiOVvd4B';
+
+      const at = new AccessToken(apiKey, apiSecret, {
+        identity: participantName || `user-${Math.floor(Math.random() * 10000)}`,
+      });
+
+      at.addGrant({
+        roomJoin: true,
+        room: roomName,
+        canPublish: isBroadcaster,
+        canSubscribe: true,
+      });
+
+      const token = await at.toJwt();
+      res.json({ token });
+    } catch (error) {
+      console.error("Error generating token:", error);
+      res.status(500).json({ error: "Failed to generate token" });
+    }
   });
 
   // Catch-all for API routes to prevent falling through to Vite
