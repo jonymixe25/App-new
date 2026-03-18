@@ -17,7 +17,7 @@ async function startServer() {
   
   const io = new Server(httpServer, {
     cors: {
-      origin: "*",
+      origin: ["https://vidamixe.mx", "https://www.vidamixe.mx", "http://localhost:3000", "*"],
       methods: ["GET", "POST"]
     },
     pingTimeout: 60000,
@@ -83,6 +83,13 @@ async function startServer() {
           chatHistory.splice(index, 1);
         }
         io.emit("message_deleted", messageId);
+      }
+    });
+
+    socket.on("stop_broadcasting", () => {
+      if (activeBroadcasters.has(socket.id)) {
+        activeBroadcasters.delete(socket.id);
+        io.emit("broadcaster_list", Array.from(activeBroadcasters.values()));
       }
     });
 

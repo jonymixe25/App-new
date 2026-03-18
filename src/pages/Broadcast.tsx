@@ -6,7 +6,6 @@ import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Pow
 import { Helmet } from "react-helmet-async";
 import { useUser } from "../contexts/UserContext";
 import Chat from "../components/Chat";
-import { webrtcConfig } from "../utils/webrtcConfig";
 
 export default function Broadcast() {
   const { user, loading: userLoading, logout } = useUser();

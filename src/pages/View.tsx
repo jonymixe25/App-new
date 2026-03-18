@@ -5,7 +5,6 @@ import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, Volume
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
 import Chat from "../components/Chat";
-import { webrtcConfig } from "../utils/webrtcConfig";
 
 export default function View() {
   const [broadcasters, setBroadcasters] = useState<any[]>([]);
