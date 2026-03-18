@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -11,6 +12,19 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  
+  // Enable CORS for all routes
+  app.use(cors({
+    origin: [
+      "https://vidamixe.mx", 
+      "https://www.vidamixe.mx", 
+      "https://app-new-production-1af2.up.railway.app",
+      "http://localhost:3000"
+    ],
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true
+  }));
+  
   app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
   const PORT = 3000;
   const httpServer = createServer(app);
