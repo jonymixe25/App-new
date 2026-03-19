@@ -29,7 +29,69 @@ export default function Broadcast() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const navigate = useNavigate();
+
+  const requestPermissions = async (mode: "user" | "environment" = facingMode) => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Media devices API not available. Please ensure you are using HTTPS.");
+      }
+
+      let mediaStream: MediaStream | null = null;
+      try {
+        // First attempt: Ideal constraints
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: mode
+          },
+          audio: true
+        });
+      } catch (err: any) {
+        console.warn("Failed with ideal constraints, trying basic video/audio", err);
+        try {
+          // Second attempt: Basic video and audio
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+          });
+        } catch (err2: any) {
+          console.warn("Failed with basic video/audio, trying audio only", err2);
+          try {
+            // Third attempt: Audio only
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              audio: true
+            });
+          } catch (err3: any) {
+            console.warn("Failed with audio only, trying video only", err3);
+            // Fourth attempt: Video only
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: true
+            });
+          }
+        }
+      }
+      
+      if (!mediaStream) {
+        throw new Error("Could not access any media devices.");
+      }
+
+      setStream(mediaStream);
+      streamRef.current = mediaStream;
+      setHasPermissions(true);
+      return mediaStream;
+    } catch (err) {
+      console.error("Error accessing media devices:", err);
+      setHasPermissions(false);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!streamRef.current) {
@@ -69,8 +131,6 @@ export default function Broadcast() {
     };
   }, []); // Only run once on mount
 
-  // Use a ref for the stream to access it inside socket listeners without re-binding
-  const streamRef = useRef<MediaStream | null>(null);
   useEffect(() => {
     streamRef.current = stream;
   }, [stream]);
@@ -131,59 +191,6 @@ export default function Broadcast() {
     } catch (error: any) {
       console.error("Error starting broadcast:", error);
       alert(`Error al conectar con el servidor de video: ${error.message || error}`);
-    }
-  };
-
-  const requestPermissions = async (mode: "user" | "environment" = facingMode) => {
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-      
-      let mediaStream: MediaStream;
-      try {
-        // First attempt: Ideal constraints
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: mode
-          },
-          audio: true
-        });
-      } catch (err: any) {
-        console.warn("Failed with ideal constraints, trying basic video/audio", err);
-        try {
-          // Second attempt: Basic video and audio
-          mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-          });
-        } catch (err2: any) {
-          console.warn("Failed with basic video/audio, trying audio only", err2);
-          try {
-            // Third attempt: Audio only
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-              audio: true
-            });
-          } catch (err3: any) {
-            console.warn("Failed with audio only, trying video only", err3);
-            // Fourth attempt: Video only
-            mediaStream = await navigator.mediaDevices.getUserMedia({
-              video: true
-            });
-          }
-        }
-      }
-      
-      setStream(mediaStream);
-      streamRef.current = mediaStream;
-      setHasPermissions(true);
-      return mediaStream;
-    } catch (err) {
-      console.error("Error accessing media devices:", err);
-      setHasPermissions(false);
-      return null;
     }
   };
 

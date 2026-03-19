@@ -9,7 +9,8 @@ import { getRecordings, SavedRecording } from "../utils/videoStorage";
 import { Video, MonitorPlay, Mountain, CloudFog, Users, MessageSquare, Newspaper, Music, MapPin, X, Play, Sparkles, ArrowRight, ChevronRight, Upload, Image as ImageIcon } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { db } from "../firebase";
-import { collection, onSnapshot, addDoc } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
+import { handleFirestoreError, OperationType } from "../firebase";
 
 interface NewsItem {
   id: string;
@@ -39,7 +40,7 @@ export default function Home() {
       newsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setNews(newsData);
     }, (error) => {
-      console.error("Error fetching news:", error);
+      handleFirestoreError(error, OperationType.GET, "news");
     });
   };
 

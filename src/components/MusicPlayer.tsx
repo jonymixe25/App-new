@@ -254,6 +254,9 @@ export default function MusicPlayer() {
             config={{
               youtube: {
                 playerVars: { showinfo: 0, controls: 0 }
+              },
+              file: {
+                forceAudio: currentTrack.type === 'radio' || currentTrack.type === 'audio'
               }
             }}
           />

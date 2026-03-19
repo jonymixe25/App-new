@@ -6,6 +6,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { useLanguage } from "../context/LanguageContext";
 import { db } from "../firebase";
 import { collection, onSnapshot } from "firebase/firestore";
+import { handleFirestoreError, OperationType } from "../firebase";
 
 export interface TeamMember {
   id: string;
@@ -55,8 +56,8 @@ export default function Team() {
       }
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching team:", error);
       setLoading(false);
+      handleFirestoreError(error, OperationType.GET, "team");
     });
 
     return () => unsubscribe();

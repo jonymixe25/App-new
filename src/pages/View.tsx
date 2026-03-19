@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2 } from "lucide-react";
+import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2, X, HelpCircle } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
 import Chat from "../components/Chat";
@@ -21,12 +21,41 @@ export default function View() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const roomRef = useRef<Room | null>(null);
+
+  useEffect(() => {
+    // Show tutorial for new users
+    const hasSeenTutorial = localStorage.getItem("hasSeenTutorial");
+    if (!hasSeenTutorial) {
+      setShowTutorial(true);
+      localStorage.setItem("hasSeenTutorial", "true");
+    }
+  }, []);
+
+  const shareUrl = window.location.href;
+  const shareText = "¡Mira esta transmisión en Vida Mixe TV!";
+
+  const handleShare = async (platform: 'whatsapp' | 'facebook' | 'native') => {
+    if (platform === 'native' && navigator.share) {
+      try {
+        await navigator.share({ title: "Vida Mixe TV", url: shareUrl });
+      } catch (err) {
+        console.error("Error sharing:", err);
+      }
+    } else if (platform === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`, '_blank');
+    } else if (platform === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+    }
+    setShowShareMenu(false);
+  };
 
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
@@ -433,13 +462,60 @@ export default function View() {
                     <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
                     {isLiked ? 'Me gusta' : 'Apoyar'}
                   </button>
-                  <button className="p-3 bg-white/5 text-neutral-400 hover:bg-white/10 rounded-full transition-all">
-                    <Share2 className="w-5 h-5" />
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowShareMenu(!showShareMenu)}
+                      className="p-3 bg-white/5 text-neutral-400 hover:bg-white/10 rounded-full transition-all"
+                    >
+                      <Share2 className="w-5 h-5" />
+                    </button>
+                    {showShareMenu && (
+                      <div className="absolute right-0 bottom-full mb-2 w-48 bg-brand-surface border border-white/10 rounded-2xl p-2 shadow-xl z-50">
+                        <button onClick={() => handleShare('native')} className="w-full text-left px-4 py-2 hover:bg-white/5 rounded-lg text-sm text-white">Compartir</button>
+                        <button onClick={() => handleShare('whatsapp')} className="w-full text-left px-4 py-2 hover:bg-white/5 rounded-lg text-sm text-white">WhatsApp</button>
+                        <button onClick={() => handleShare('facebook')} className="w-full text-left px-4 py-2 hover:bg-white/5 rounded-lg text-sm text-white">Facebook</button>
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => setShowTutorial(true)}
+                    className="p-3 bg-white/5 text-neutral-400 hover:bg-white/10 rounded-full transition-all"
+                  >
+                    <HelpCircle className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Tutorial Modal */}
+          <AnimatePresence>
+            {showTutorial && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              >
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-brand-surface border border-white/10 p-8 rounded-3xl max-w-md w-full relative"
+                >
+                  <button onClick={() => setShowTutorial(false)} className="absolute top-4 right-4 text-neutral-500 hover:text-white"><X /></button>
+                  <h2 className="text-2xl font-bold text-white mb-4">¿Cómo ver la transmisión?</h2>
+                  <ul className="space-y-4 text-neutral-300 text-sm">
+                    <li>1. Selecciona un canal de la lista a la derecha.</li>
+                    <li>2. Espera a que la transmisión cargue.</li>
+                    <li>3. Usa los controles de video para pausar o ajustar el volumen.</li>
+                    <li>4. ¡Participa en el chat para interactuar con la comunidad!</li>
+                  </ul>
+                  <button onClick={() => setShowTutorial(false)} className="mt-8 w-full bg-brand-primary text-white font-bold py-3 rounded-xl">Entendido</button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Sidebar */}
           <div className="w-full lg:w-96 bg-brand-surface border-l border-white/5 flex flex-col">

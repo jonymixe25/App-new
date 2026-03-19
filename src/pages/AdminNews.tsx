@@ -6,6 +6,7 @@ import { moderateContent } from "../services/moderationService";
 import { db, auth } from "../firebase";
 import { collection, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
 import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
+import { handleFirestoreError, OperationType } from "../firebase";
 
 interface NewsItem {
   id: string;
@@ -65,15 +66,17 @@ export default function AdminNews() {
         const newsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as NewsItem[];
         newsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setNews(newsData);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, "news"));
+      
       const unsubVideos = onSnapshot(collection(db, "community_videos"), (snapshot) => {
         const videoData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as CommunityVideo[];
         setVideos(videoData);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, "community_videos"));
+      
       const unsubTeam = onSnapshot(collection(db, "team"), (snapshot) => {
         const teamData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as TeamMember[];
         setTeam(teamData);
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, "team"));
       return () => {
         unsubNews();
         unsubVideos();
@@ -189,7 +192,7 @@ export default function AdminNews() {
       setContent("");
       setAuthor("");
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.CREATE, "news");
     } finally {
       setLoading(false);
     }
@@ -224,7 +227,7 @@ export default function AdminNews() {
       setVPrice("");
       setVUrl("");
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.CREATE, "community_videos");
     } finally {
       setLoading(false);
     }
@@ -236,7 +239,7 @@ export default function AdminNews() {
     try {
       await deleteDoc(doc(db, "news", id));
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.DELETE, `news/${id}`);
     }
   };
 
@@ -246,7 +249,7 @@ export default function AdminNews() {
     try {
       await deleteDoc(doc(db, "community_videos", id));
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.DELETE, `community_videos/${id}`);
     }
   };
 
@@ -278,7 +281,7 @@ export default function AdminNews() {
       setTGithub("");
       setTEmail("");
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.CREATE, "team");
     } finally {
       setLoading(false);
     }
@@ -290,7 +293,7 @@ export default function AdminNews() {
     try {
       await deleteDoc(doc(db, "team", id));
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.DELETE, `team/${id}`);
     }
   };
 
