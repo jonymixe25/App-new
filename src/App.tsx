@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./contexts/UserContext";
 import Home from "./pages/Home";
@@ -21,6 +22,7 @@ export default function App() {
       <LanguageProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-brand-bg flex flex-col">
+            <Toaster position="top-right" />
             <Navbar />
             <main className="flex-1">
               <Routes>

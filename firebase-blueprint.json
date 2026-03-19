@@ -23,9 +23,10 @@
         "author": { "type": "string" },
         "thumbnail": { "type": "string" },
         "price": { "type": "string" },
-        "video_url": { "type": "string" }
+        "video_url": { "type": "string" },
+        "published": { "type": "boolean" }
       },
-      "required": ["title", "author", "thumbnail", "price", "video_url"]
+      "required": ["title", "author", "thumbnail", "price", "video_url", "published"]
     },
     "TeamMember": {
       "title": "TeamMember",

@@ -47,7 +47,8 @@ service cloud.firestore {
              data.author is string && data.author.size() > 0 && data.author.size() < 100 &&
              data.thumbnail is string && data.thumbnail.size() > 0 && data.thumbnail.size() < 1000 &&
              data.price is string && data.price.size() > 0 && data.price.size() < 50 &&
-             data.video_url is string && data.video_url.size() > 0 && data.video_url.size() < 1000;
+             data.video_url is string && data.video_url.size() > 0 && data.video_url.size() < 1000 &&
+             data.published is bool;
     }
 
     function isValidTeamMember(data) {
@@ -81,8 +82,8 @@ service cloud.firestore {
 
     match /community_videos/{videoId} {
       allow read: if true;
-      allow create: if isAdmin() && hasOnlyAllowedFields(['title', 'author', 'thumbnail', 'price', 'video_url']) && isValidCommunityVideo(request.resource.data);
-      allow update: if isAdmin() && hasOnlyAllowedFields(['title', 'author', 'thumbnail', 'price', 'video_url']) && isValidCommunityVideo(request.resource.data);
+      allow create: if isAdmin() && hasOnlyAllowedFields(['title', 'author', 'thumbnail', 'price', 'video_url', 'published']) && isValidCommunityVideo(request.resource.data);
+      allow update: if isAdmin() && hasOnlyAllowedFields(['title', 'author', 'thumbnail', 'price', 'video_url', 'published']) && isValidCommunityVideo(request.resource.data);
       allow delete: if isAdmin();
     }
 
