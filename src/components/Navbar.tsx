@@ -15,7 +15,6 @@ export default function Navbar() {
     { path: "/view", label: t("nav_view"), icon: MonitorPlay },
     { path: "/transmitir", label: "Transmitir", icon: Video },
     { path: "/admin-news", label: "Admin Noticias", icon: Newspaper },
-    { path: "/admin-users", label: "Admin Usuarios", icon: Settings },
     { path: "/traductor", label: t("nav_translator"), icon: Languages },
     { path: "/team", label: t("team_title"), icon: Users },
   ];
@@ -25,7 +24,9 @@ export default function Navbar() {
   };
 
   const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false);
+    setTimeout(() => {
+      setIsMobileMenuOpen(false);
+    }, 150);
   };
 
   return (
