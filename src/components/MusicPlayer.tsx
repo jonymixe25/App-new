@@ -1,24 +1,31 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Music, Maximize2, Minimize2, X } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Music, Maximize2, Minimize2, X, ListMusic, Radio, Youtube } from 'lucide-react';
+import ReactPlayer from 'react-player';
 
 const TRACKS = [
   {
     id: 1,
     title: "Sones Mixes - Tradicional",
     artist: "Banda Filarmónica",
-    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    type: "audio",
+    icon: Music
   },
   {
     id: 2,
-    title: "Danza del Rey Condoy",
-    artist: "Música Ayuuk",
-    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
+    title: "Radio Jempoj",
+    artist: "Transmisión en vivo",
+    url: "https://stream.zeno.fm/f3a9z8y7x6w5v", // Placeholder stream URL
+    type: "radio",
+    icon: Radio
   },
   {
     id: 3,
-    title: "Sones de la Montaña",
-    artist: "Ensamble Mixe",
-    url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"
+    title: "Música Mixe",
+    artist: "Lista de YouTube",
+    url: "https://www.youtube.com/playlist?list=PL4fGSI1pDJn6puJdseH2Rt9sMvt9E2M4i", // Placeholder YouTube playlist
+    type: "youtube",
+    icon: Youtube
   }
 ];
 
@@ -30,58 +37,64 @@ export default function MusicPlayer() {
   const [volume, setVolume] = useState(0.7);
   const [progress, setProgress] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [customUrl, setCustomUrl] = useState("");
+  const [tracks, setTracks] = useState(TRACKS);
   
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<any>(null);
 
-  const currentTrack = TRACKS[currentTrackIndex];
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  useEffect(() => {
-    if (isPlaying && audioRef.current) {
-      audioRef.current.play().catch(e => console.error("Error playing audio:", e));
-    } else if (!isPlaying && audioRef.current) {
-      audioRef.current.pause();
-    }
-  }, [isPlaying, currentTrackIndex]);
+  const currentTrack = tracks[currentTrackIndex];
 
   const togglePlay = () => {
     setIsPlaying(!isPlaying);
   };
 
   const handleNext = () => {
-    setCurrentTrackIndex((prev) => (prev + 1) % TRACKS.length);
+    setCurrentTrackIndex((prev) => (prev + 1) % tracks.length);
     setIsPlaying(true);
   };
 
   const handlePrev = () => {
-    setCurrentTrackIndex((prev) => (prev - 1 + TRACKS.length) % TRACKS.length);
+    setCurrentTrackIndex((prev) => (prev - 1 + tracks.length) % tracks.length);
     setIsPlaying(true);
   };
 
   const toggleMute = () => {
-    if (audioRef.current) {
-      audioRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-    }
+    setIsMuted(!isMuted);
   };
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      const current = audioRef.current.currentTime;
-      const duration = audioRef.current.duration;
-      if (duration > 0) {
-        setProgress((current / duration) * 100);
-      }
-    }
+  const handleProgress = (state: { played: number }) => {
+    setProgress(state.played * 100);
   };
 
   const handleEnded = () => {
     handleNext();
+  };
+
+  const selectTrack = (index: number) => {
+    setCurrentTrackIndex(index);
+    setIsPlaying(true);
+    setShowPlaylist(false);
+  };
+
+  const handleAddCustomUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customUrl) return;
+    
+    const newTrack = {
+      id: Date.now(),
+      title: "Enlace Personalizado",
+      artist: "YouTube / Audio",
+      url: customUrl,
+      type: "custom",
+      icon: Youtube
+    };
+    
+    setTracks([...tracks, newTrack]);
+    setCurrentTrackIndex(tracks.length);
+    setIsPlaying(true);
+    setCustomUrl("");
+    setShowPlaylist(false);
   };
 
   if (!isVisible) {
@@ -96,6 +109,8 @@ export default function MusicPlayer() {
     );
   }
 
+  const TrackIcon = currentTrack.icon;
+
   return (
     <div className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${isExpanded ? 'w-80' : 'w-auto'}`}>
       <div className="bg-brand-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
@@ -104,7 +119,7 @@ export default function MusicPlayer() {
         <div className="flex items-center justify-between p-3 border-b border-white/5">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
             <div className={`w-10 h-10 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary ${isPlaying ? 'animate-pulse' : ''}`}>
-              <Music className="w-5 h-5" />
+              <TrackIcon className="w-5 h-5" />
             </div>
             {isExpanded ? (
               <div className="flex-1 min-w-0">
@@ -125,6 +140,9 @@ export default function MusicPlayer() {
           
           {isExpanded && (
             <div className="flex items-center gap-1">
+              <button onClick={() => setShowPlaylist(!showPlaylist)} className={`p-2 transition-colors ${showPlaylist ? 'text-brand-primary' : 'text-neutral-400 hover:text-white'}`}>
+                <ListMusic className="w-4 h-4" />
+              </button>
               <button onClick={() => setIsExpanded(false)} className="p-2 text-neutral-400 hover:text-white transition-colors">
                 <Minimize2 className="w-4 h-4" />
               </button>
@@ -134,6 +152,55 @@ export default function MusicPlayer() {
             </div>
           )}
         </div>
+
+        {/* Playlist View */}
+        {isExpanded && showPlaylist && (
+          <div className="p-2 max-h-64 overflow-y-auto border-b border-white/5 bg-black/20 flex flex-col gap-2">
+            <form onSubmit={handleAddCustomUrl} className="flex gap-2 p-2">
+              <input
+                type="url"
+                placeholder="Pegar enlace de YouTube..."
+                value={customUrl}
+                onChange={(e) => setCustomUrl(e.target.value)}
+                className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-brand-primary"
+              />
+              <button
+                type="submit"
+                className="bg-brand-primary text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-primary/80 transition-colors"
+              >
+                Añadir
+              </button>
+            </form>
+            
+            <div className="space-y-1">
+              {tracks.map((track, index) => {
+                const Icon = track.icon;
+                return (
+                  <button
+                    key={track.id}
+                    onClick={() => selectTrack(index)}
+                    className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left ${
+                      index === currentTrackIndex ? 'bg-brand-primary/20 text-brand-primary' : 'hover:bg-white/5 text-neutral-300'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{track.title}</p>
+                      <p className="text-xs opacity-70 truncate">{track.artist}</p>
+                    </div>
+                    {index === currentTrackIndex && isPlaying && (
+                      <div className="flex gap-0.5 h-3">
+                        <div className="w-1 bg-brand-primary animate-[bounce_1s_infinite]" />
+                        <div className="w-1 bg-brand-primary animate-[bounce_1s_infinite_0.2s]" />
+                        <div className="w-1 bg-brand-primary animate-[bounce_1s_infinite_0.4s]" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Expanded Controls */}
         {isExpanded && (
@@ -172,12 +239,25 @@ export default function MusicPlayer() {
           </div>
         )}
 
-        <audio
-          ref={audioRef}
-          src={currentTrack.url}
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={handleEnded}
-        />
+        {/* Hidden ReactPlayer */}
+        <div className="hidden">
+          <ReactPlayer
+            ref={playerRef}
+            url={currentTrack.url}
+            playing={isPlaying}
+            volume={volume}
+            muted={isMuted}
+            onProgress={handleProgress}
+            onEnded={handleEnded}
+            width="0"
+            height="0"
+            config={{
+              youtube: {
+                playerVars: { showinfo: 0, controls: 0 }
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );

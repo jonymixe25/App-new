@@ -406,8 +406,12 @@ export default function Home() {
       <footer className="py-20 px-6 border-t border-white/5 bg-brand-bg">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-brand-primary rounded-2xl flex items-center justify-center">
-              <Mountain className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Vida Mixe Logo" className="w-full h-full object-contain" onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement?.classList.add('bg-brand-primary');
+                e.currentTarget.parentElement?.insertAdjacentHTML('beforeend', '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mountain"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>');
+              }} />
             </div>
             <div>
               <h3 className="text-xl font-black text-white uppercase tracking-tighter">Vida Mixe TV</h3>

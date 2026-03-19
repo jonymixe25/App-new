@@ -1,23 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { io } from "socket.io-client";
-import { MonitorPlay, Users, Play } from "lucide-react";
+import { MonitorPlay, Users, Play, VolumeX, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { Room, RoomEvent } from "livekit-client";
+import { Link } from "react-router-dom";
 
 export default function LivePreview() {
   const [isLive, setIsLive] = useState(false);
   const [viewers, setViewers] = useState(0);
   const [streamName, setStreamName] = useState("");
+  const [broadcaster, setBroadcaster] = useState<any>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const roomRef = useRef<Room | null>(null);
 
   useEffect(() => {
-    const socket = io();
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+    const socket = io(backendUrl);
 
     socket.on("broadcaster_list", (list: any[]) => {
       if (list.length > 0) {
         setIsLive(true);
         setStreamName(list[0].name);
-        setViewers(list.reduce((acc, b) => acc + b.viewers, 0));
+        setViewers(list.reduce((acc: number, b: any) => acc + b.viewers, 0));
+        setBroadcaster(list[0]);
       } else {
         setIsLive(false);
+        setBroadcaster(null);
+        if (roomRef.current) {
+          roomRef.current.disconnect();
+          roomRef.current = null;
+        }
       }
     });
 
@@ -25,11 +39,60 @@ export default function LivePreview() {
 
     return () => {
       socket.disconnect();
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+      }
     };
   }, []);
 
+  useEffect(() => {
+    if (broadcaster && !roomRef.current) {
+      const connectToRoom = async () => {
+        try {
+          const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+          const response = await fetch(`${backendUrl}/api/livekit/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roomName: broadcaster.name,
+              participantName: `Preview-${Math.floor(Math.random() * 1000)}`,
+              isBroadcaster: false
+            })
+          });
+          
+          if (!response.ok) return;
+          
+          const { token } = await response.json();
+          const room = new Room();
+          roomRef.current = room;
+
+          room.on(RoomEvent.TrackSubscribed, (track) => {
+            if (videoRef.current) {
+              track.attach(videoRef.current);
+            }
+          });
+
+          await room.connect('wss://new-app-6tu2ilh8.livekit.cloud', token);
+        } catch (error) {
+          console.error("Error connecting to LiveKit room for preview:", error);
+        }
+      };
+      
+      connectToRoom();
+    }
+  }, [broadcaster]);
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
   return (
-    <div className="relative aspect-video bg-stone-900 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl group">
+    <Link to="/view" className="block relative aspect-video bg-stone-900 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl group">
       <AnimatePresence mode="wait">
         {isLive ? (
           <motion.div 
@@ -39,11 +102,12 @@ export default function LivePreview() {
             exit={{ opacity: 0 }}
             className="absolute inset-0"
           >
-            <img 
-              src="https://picsum.photos/seed/live-stream/800/450" 
-              alt="Live Stream Preview" 
-              className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700"
-              referrerPolicy="no-referrer"
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted={isMuted}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
             
@@ -57,12 +121,21 @@ export default function LivePreview() {
               </div>
             </div>
 
+            <div className="absolute top-6 right-6">
+              <button 
+                onClick={toggleMute}
+                className="p-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/10 transition-colors"
+              >
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            </div>
+
             <div className="absolute bottom-6 left-6 right-6">
               <h4 className="text-white font-bold text-lg truncate mb-1">{streamName}</h4>
               <p className="text-neutral-400 text-xs uppercase tracking-widest font-medium">Sintonizando ahora</p>
             </div>
 
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               <div className="w-16 h-16 bg-brand-primary text-white rounded-full flex items-center justify-center shadow-2xl shadow-brand-primary/40 scale-90 group-hover:scale-100 transition-transform">
                 <Play className="w-8 h-8 fill-current ml-1" />
               </div>
@@ -86,6 +159,6 @@ export default function LivePreview() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </Link>
   );
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 import { Room, LocalVideoTrack, LocalAudioTrack } from "livekit-client";
-import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download } from "lucide-react";
+import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download, FlipHorizontal } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { useUser } from "../contexts/UserContext";
 import Chat from "../components/Chat";
@@ -19,6 +19,7 @@ export default function Broadcast() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -133,16 +134,47 @@ export default function Broadcast() {
     }
   };
 
-  const requestPermissions = async () => {
+  const requestPermissions = async (mode: "user" | "environment" = facingMode) => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: "user"
-        },
-        audio: true
-      });
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      let mediaStream: MediaStream;
+      try {
+        // First attempt: Ideal constraints
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: mode
+          },
+          audio: true
+        });
+      } catch (err: any) {
+        console.warn("Failed with ideal constraints, trying basic video/audio", err);
+        try {
+          // Second attempt: Basic video and audio
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+          });
+        } catch (err2: any) {
+          console.warn("Failed with basic video/audio, trying audio only", err2);
+          try {
+            // Third attempt: Audio only
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              audio: true
+            });
+          } catch (err3: any) {
+            console.warn("Failed with audio only, trying video only", err3);
+            // Fourth attempt: Video only
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: true
+            });
+          }
+        }
+      }
       
       setStream(mediaStream);
       streamRef.current = mediaStream;
@@ -152,6 +184,20 @@ export default function Broadcast() {
       console.error("Error accessing media devices:", err);
       setHasPermissions(false);
       return null;
+    }
+  };
+
+  const flipCamera = async () => {
+    const newMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newMode);
+    
+    const newStream = await requestPermissions(newMode);
+    
+    if (newStream && isLive && roomRef.current && localVideoTrackRef.current) {
+      const videoTrack = newStream.getVideoTracks()[0];
+      if (videoTrack) {
+        await localVideoTrackRef.current.replaceTrack(videoTrack);
+      }
     }
   };
 
@@ -287,7 +333,7 @@ export default function Broadcast() {
               </div>
               <p className="text-neutral-400 font-medium mb-4">Solicitando acceso a cámara y micrófono...</p>
               <button 
-                onClick={requestPermissions}
+                onClick={() => requestPermissions()}
                 className="px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-xl transition-all"
               >
                 Permitir Acceso
@@ -363,6 +409,14 @@ export default function Broadcast() {
                 title={isVideoOff ? "Activar Cámara" : "Desactivar Cámara"}
               >
                 {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
+              </button>
+              <button 
+                onClick={flipCamera}
+                disabled={!stream}
+                className="p-3 sm:p-4 rounded-full transition-all disabled:opacity-50 bg-white/10 text-white hover:bg-white/20"
+                title="Voltear Cámara"
+              >
+                <FlipHorizontal className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
 
