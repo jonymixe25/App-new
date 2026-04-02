@@ -1,367 +1,535 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import { Video, VideoOff, Mic, MicOff, AlertCircle, Activity, Users, Clock } from "lucide-react";
+import { Room, LocalVideoTrack, LocalAudioTrack } from "livekit-client";
+import { Video, Mic, MicOff, VideoOff, Settings, Users, MessageSquare, Send, Power, ShieldCheck, LogOut, Circle, Square, Download, FlipHorizontal } from "lucide-react";
+import { Helmet } from "react-helmet-async";
+import { useUser } from "../contexts/UserContext";
 import Chat from "../components/Chat";
 
-const config = {
-  iceServers: [
-    {
-      urls: ["stun:stun.l.google.com:19302"]
-    }
-  ]
-};
-
 export default function Broadcast() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const { user, loading: userLoading, logout } = useUser();
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const peerConnections = useRef<{ [id: string]: RTCPeerConnection }>({});
-  
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [streamName, setStreamName] = useState("");
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
   const [viewers, setViewers] = useState(0);
-  const [uptime, setUptime] = useState(0);
+  const [isLive, setIsLive] = useState(false);
+  const [hasPermissions, setHasPermissions] = useState<boolean | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const roomRef = useRef<Room | null>(null);
+  const localVideoTrackRef = useRef<LocalVideoTrack | null>(null);
+  const localAudioTrackRef = useRef<LocalAudioTrack | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const navigate = useNavigate();
 
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
-  const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string | null>(null);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+  const requestPermissions = async (mode: "user" | "environment" = facingMode) => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Media devices API not available. Please ensure you are using HTTPS.");
+      }
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isStreaming) {
-      interval = setInterval(() => {
-        setUptime(prev => prev + 1);
-      }, 1000);
-    } else {
-      setUptime(0);
+      let mediaStream: MediaStream | null = null;
+      try {
+        // First attempt: Ideal constraints
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: mode
+          },
+          audio: true
+        });
+      } catch (err: any) {
+        console.warn("Failed with ideal constraints, trying basic video/audio", err);
+        try {
+          // Second attempt: Basic video and audio
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+          });
+        } catch (err2: any) {
+          console.warn("Failed with basic video/audio, trying audio only", err2);
+          try {
+            // Third attempt: Audio only
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              audio: true
+            });
+          } catch (err3: any) {
+            console.warn("Failed with audio only, trying video only", err3);
+            // Fourth attempt: Video only
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: true
+            });
+          }
+        }
+      }
+      
+      if (!mediaStream) {
+        throw new Error("Could not access any media devices.");
+      }
+
+      setStream(mediaStream);
+      streamRef.current = mediaStream;
+      setHasPermissions(true);
+      return mediaStream;
+    } catch (err) {
+      console.error("Error accessing media devices:", err);
+      setHasPermissions(false);
+      return null;
     }
-    return () => clearInterval(interval);
-  }, [isStreaming]);
-
-  const formatUptime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   useEffect(() => {
-    const s = io(window.location.origin);
-    setSocket(s);
+    if (!streamRef.current) {
+      requestPermissions();
+    }
+  }, []);
 
-    s.on("viewers_count", (count: number) => {
+  useEffect(() => {
+    // Initialize Socket.IO once
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+    const socket = io(backendUrl);
+    socketRef.current = socket;
+
+    socket.on("connect", () => setSocketStatus("connected"));
+    socket.on("disconnect", () => setSocketStatus("disconnected"));
+    socket.on("connect_error", () => setSocketStatus("disconnected"));
+
+    socket.on("viewers_count", (count: number) => {
       setViewers(count);
     });
 
-    s.on("watcher", (id: string) => {
-      if (!stream) return;
-      
-      const peerConnection = new RTCPeerConnection(config);
-      peerConnections.current[id] = peerConnection;
-
-      stream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, stream);
-      });
-
-      peerConnection.onicecandidate = event => {
-        if (event.candidate) {
-          s.emit("candidate", id, event.candidate);
-        }
-      };
-
-      peerConnection
-        .createOffer()
-        .then(sdp => peerConnection.setLocalDescription(sdp))
-        .then(() => {
-          s.emit("offer", id, peerConnection.localDescription);
-        });
-    });
-
-    s.on("answer", (id: string, description: RTCSessionDescriptionInit) => {
-      peerConnections.current[id]?.setRemoteDescription(description);
-    });
-
-    s.on("candidate", (id: string, candidate: RTCIceCandidateInit) => {
-      peerConnections.current[id]?.addIceCandidate(new RTCIceCandidate(candidate));
-    });
-
-    s.on("disconnectPeer", (id: string) => {
-      if (peerConnections.current[id]) {
-        peerConnections.current[id].close();
-        delete peerConnections.current[id];
-      }
-    });
-
     return () => {
-      s.disconnect();
-      Object.values<RTCPeerConnection>(peerConnections.current).forEach(pc => pc.close());
+      socket.disconnect();
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+      }
+      if (localVideoTrackRef.current) {
+        localVideoTrackRef.current.stop();
+      }
+      if (localAudioTrackRef.current) {
+        localAudioTrackRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
+  }, []); // Only run once on mount
+
+  useEffect(() => {
+    streamRef.current = stream;
   }, [stream]);
 
   useEffect(() => {
-    const updateDevices = async () => {
-      try {
-        const list = await navigator.mediaDevices.enumerateDevices();
-        setDevices(list);
-        const video = list.find(d => d.kind === 'videoinput');
-        const audio = list.find(d => d.kind === 'audioinput');
-        if (!selectedVideoDeviceId && video) setSelectedVideoDeviceId(video.deviceId);
-        if (!selectedAudioDeviceId && audio) setSelectedAudioDeviceId(audio.deviceId);
-      } catch (e) {
-        console.warn('No se pudieron enumerar los dispositivos', e);
-      }
-    };
-
-    updateDevices();
-    navigator.mediaDevices.addEventListener?.('devicechange', updateDevices);
-    return () => navigator.mediaDevices.removeEventListener?.('devicechange', updateDevices);
-  }, [isStreaming]);
-
-  const startStream = async () => {
-    try {
-      const videoConstraints: any = {
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      };
-      if (selectedVideoDeviceId) videoConstraints.deviceId = { exact: selectedVideoDeviceId };
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: selectedAudioDeviceId ? { deviceId: { exact: selectedAudioDeviceId } } : true
-      });
-      
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-      
-      setIsStreaming(true);
-      setError(null);
-      
-      if (socket) {
-        socket.emit("broadcaster");
-      }
-    } catch (err) {
-      console.error("Error accessing media devices.", err);
-      setError("No se pudo acceder a la cámara o micrófono. Asegúrate de dar los permisos necesarios.");
-    }
-  };
-
-  const startScreenShare = async () => {
-    if (!socket) return;
-    try {
-      const displayStream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true });
-      const screenTrack = displayStream.getVideoTracks()[0];
-      if (!screenTrack) return;
-      screenTrackRef.current = screenTrack;
-      setIsScreenSharing(true);
-
-      // Replace local video element
-      if (videoRef.current) {
-        const current = stream ? new MediaStream([...stream.getTracks().filter(t => t.kind !== 'video'), screenTrack]) : new MediaStream([screenTrack]);
-        videoRef.current.srcObject = current;
-      }
-
-      // Replace track in existing peer connections
-      Object.values(peerConnections.current).forEach((pc: RTCPeerConnection) => {
-        try {
-          const senders = pc.getSenders();
-          const sender = senders.find(s => s.track && s.track.kind === 'video');
-          if (sender && 'replaceTrack' in sender) {
-            // @ts-ignore
-            sender.replaceTrack(screenTrack);
-          }
-        } catch (e) {
-          console.warn('No se pudo reemplazar la pista en un peer', e);
-        }
-      });
-
-      // When screen sharing stops, revert to camera
-      screenTrack.onended = () => {
-        stopScreenShare();
-      };
-    } catch (e) {
-      console.error('Error al compartir pantalla', e);
-    }
-  };
-
-  const stopScreenShare = () => {
-    const screenTrack = screenTrackRef.current;
-    if (screenTrack) {
-      screenTrack.stop();
-      screenTrackRef.current = null;
-    }
-    setIsScreenSharing(false);
-
-    // If we have a camera stream, restore its video track to peers and local video
-    if (stream) {
-      const cameraTrack = stream.getVideoTracks()[0];
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      if (cameraTrack) {
-        Object.values(peerConnections.current).forEach((pc: RTCPeerConnection) => {
-          try {
-            const senders = pc.getSenders();
-            const sender = senders.find(s => s.track && s.track.kind === 'video');
-            if (sender && 'replaceTrack' in sender) {
-              // @ts-ignore
-              sender.replaceTrack(cameraTrack);
-            }
-          } catch (e) {
-            console.warn('No se pudo restaurar la pista en un peer', e);
-          }
-        });
-      }
-    }
-  };
-
-  const stopStream = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
     if (videoRef.current) {
-      videoRef.current.srcObject = null;
+      videoRef.current.srcObject = stream;
     }
-    setIsStreaming(false);
+  }, [stream, isLive]);
+
+  const startBroadcast = async () => {
+    let currentStream = stream;
+    if (!currentStream) {
+      currentStream = await requestPermissions();
+      if (!currentStream) return;
+    }
     
-    // Close all connections
-    Object.values<RTCPeerConnection>(peerConnections.current).forEach(pc => pc.close());
-    peerConnections.current = {};
+    const finalStreamName = streamName || user?.name || "Vida Mixe Stream";
+
+    try {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || "https://app-new-production-1af2.up.railway.app";
+      const response = await fetch(`${backendUrl}/api/livekit/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: finalStreamName,
+          participantName: user?.name || "Locutor",
+          isBroadcaster: true
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error en el servidor: ${response.status} ${response.statusText}`);
+      }
+      
+      const { token } = await response.json();
+
+      const room = new Room();
+      roomRef.current = room;
+      await room.connect('wss://new-app-6tu2ilh8.livekit.cloud', token);
+
+      const videoTrack = currentStream.getVideoTracks()[0];
+      const audioTrack = currentStream.getAudioTracks()[0];
+
+      if (videoTrack) {
+        const lvt = new LocalVideoTrack(videoTrack);
+        localVideoTrackRef.current = lvt;
+        await room.localParticipant.publishTrack(lvt);
+      }
+      if (audioTrack) {
+        const lat = new LocalAudioTrack(audioTrack);
+        localAudioTrackRef.current = lat;
+        await room.localParticipant.publishTrack(lat);
+      }
+
+      socketRef.current?.emit("broadcaster", finalStreamName);
+      setIsLive(true);
+    } catch (error: any) {
+      console.error("Error starting broadcast:", error);
+      alert(`Error al conectar con el servidor de video: ${error.message || error}`);
+    }
   };
 
-  const toggleVideo = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
+  const flipCamera = async () => {
+    const newMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newMode);
+    
+    const newStream = await requestPermissions(newMode);
+    
+    if (newStream && isLive && roomRef.current && localVideoTrackRef.current) {
+      const videoTrack = newStream.getVideoTracks()[0];
       if (videoTrack) {
-        videoTrack.enabled = !videoTrack.enabled;
-        setVideoEnabled(videoTrack.enabled);
+        await localVideoTrackRef.current.replaceTrack(videoTrack);
       }
     }
   };
 
-  const toggleAudio = () => {
-    if (stream) {
+  const stopBroadcast = () => {
+    if (isRecording) stopRecording();
+    
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+    if (localVideoTrackRef.current) {
+      localVideoTrackRef.current.stop();
+      localVideoTrackRef.current = null;
+    }
+    if (localAudioTrackRef.current) {
+      localAudioTrackRef.current.stop();
+      localAudioTrackRef.current = null;
+    }
+
+    stream?.getTracks().forEach(track => track.stop());
+    setStream(null);
+    setIsLive(false);
+    socketRef.current?.emit("stop_broadcasting");
+    
+    // Refresh permissions to get local stream back for preview
+    requestPermissions();
+  };
+
+  const toggleMute = () => {
+    if (localAudioTrackRef.current) {
+      if (isMuted) {
+        localAudioTrackRef.current.unmute();
+      } else {
+        localAudioTrackRef.current.mute();
+      }
+    } else if (stream) {
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        setAudioEnabled(audioTrack.enabled);
+      }
+    }
+    setIsMuted(!isMuted);
+  };
+
+  const toggleVideo = () => {
+    if (localVideoTrackRef.current) {
+      if (isVideoOff) {
+        localVideoTrackRef.current.unmute();
+      } else {
+        localVideoTrackRef.current.mute();
+      }
+    } else if (stream) {
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+      }
+    }
+    setIsVideoOff(!isVideoOff);
+  };
+
+  const startRecording = () => {
+    if (!stream) return;
+
+    recordedChunksRef.current = [];
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: "video/webm;codecs=vp9,opus"
+    });
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        recordedChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunksRef.current, {
+        type: "video/webm"
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `vida-mixe-broadcast-${new Date().toISOString()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    mediaRecorder.start();
+    mediaRecorderRef.current = mediaRecorder;
+    setIsRecording(true);
+    setRecordingTime(0);
+    timerRef.current = setInterval(() => {
+      setRecordingTime(prev => prev + 1);
+    }, 1000);
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return [h, m, s].map(v => v < 10 ? "0" + v : v).filter((v, i) => v !== "00" || i > 0).join(":");
+  };
+
+  const handleLogout = async () => {
+    stopBroadcast();
+    await logout();
+    navigate("/auth");
+  };
+
   return (
-    <div className="h-screen bg-zinc-950 text-zinc-50 flex flex-col overflow-hidden">
-      <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 p-6 flex flex-col overflow-y-auto">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-xl flex items-center gap-3 mb-6 shrink-0">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <p>{error}</p>
+    <div className="min-h-screen bg-brand-bg text-neutral-50 flex flex-col">
+      <Helmet>
+        <title>Panel de Transmisión | Vida Mixe TV</title>
+      </Helmet>
+
+      <div className="flex-1 flex flex-col lg:flex-row">
+        {/* Video Area */}
+        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+          {!stream && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-900 z-10">
+              <div className="w-24 h-24 bg-brand-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Video className="w-12 h-12 text-brand-primary animate-pulse" />
+              </div>
+              <p className="text-neutral-400 font-medium mb-4">Solicitando acceso a cámara y micrófono...</p>
+              <button 
+                onClick={() => requestPermissions()}
+                className="px-6 py-3 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-xl transition-all"
+              >
+                Permitir Acceso
+              </button>
+            </div>
+          )}
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            className={`w-full h-full object-cover ${isVideoOff ? 'hidden' : 'block'}`}
+          />
+          
+          {isVideoOff && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-900">
+              <div className="w-24 h-24 bg-brand-primary/10 rounded-full flex items-center justify-center mb-4">
+                <VideoOff className="w-12 h-12 text-brand-primary" />
+              </div>
+              <p className="text-neutral-500 font-medium">Cámara desactivada</p>
             </div>
           )}
 
-          {/* Panel de estadísticas removido para UI simplificada */}
-
-          <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-zinc-800 flex-shrink-0">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="w-full h-full object-cover"
-            />
+          {/* Overlay Controls */}
+          <div className="absolute top-4 sm:top-6 left-4 sm:left-6 flex flex-col gap-3 z-10 max-w-[calc(100%-2rem)]">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+              <div className={`flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full backdrop-blur-md border ${isLive ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-white/10 border-white/10 text-neutral-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-neutral-500'}`} />
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">{isLive ? 'En Vivo' : 'Offline'}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-[10px] sm:text-xs font-bold">{viewers}</span>
+              </div>
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white" title="Estado del Servidor">
+                <div className={`w-2 h-2 rounded-full ${socketStatus === 'connected' ? 'bg-emerald-500' : socketStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className="text-[10px] sm:text-xs font-bold capitalize">{socketStatus === 'connected' ? 'Conectado' : socketStatus === 'connecting' ? 'Conectando...' : 'Desconectado'}</span>
+              </div>
+              {isLive && (
+                <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-emerald-400" title="Calidad de Transmisión">
+                  <div className="flex items-end gap-0.5 h-2 sm:h-3">
+                    <div className="w-0.5 sm:w-1 bg-emerald-400 h-1/3 rounded-sm"></div>
+                    <div className="w-0.5 sm:w-1 bg-emerald-400 h-2/3 rounded-sm"></div>
+                    <div className="w-0.5 sm:w-1 bg-emerald-400 h-full rounded-sm"></div>
+                  </div>
+                  <span className="text-[10px] sm:text-xs font-bold">Excelente</span>
+                </div>
+              )}
+            </div>
             
-            {!isStreaming && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/90 backdrop-blur-sm">
-                <div className="w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-6">
-                  <Video className="w-10 h-10" />
-                </div>
-                <h2 className="text-2xl font-semibold mb-2">Listo para transmitir</h2>
-                <p className="text-zinc-400 mb-8 max-w-md text-center">
-                  Asegúrate de estar en un lugar iluminado y con buena conexión a internet.
-                </p>
-                <div className="flex gap-3 mb-6">
-                  <div className="text-sm">
-                    <label className="text-zinc-400 block mb-1">Cámara</label>
-                    <select
-                      value={selectedVideoDeviceId ?? ''}
-                      onChange={(e) => setSelectedVideoDeviceId(e.target.value || null)}
-                      className="bg-zinc-800 border border-zinc-700 text-zinc-200 px-3 py-2 rounded-md"
-                    >
-                      {devices.filter(d => d.kind === 'videoinput').map(d => (
-                        <option key={d.deviceId} value={d.deviceId}>{d.label || 'Cámara ' + d.deviceId}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="text-sm">
-                    <label className="text-zinc-400 block mb-1">Micrófono</label>
-                    <select
-                      value={selectedAudioDeviceId ?? ''}
-                      onChange={(e) => setSelectedAudioDeviceId(e.target.value || null)}
-                      className="bg-zinc-800 border border-zinc-700 text-zinc-200 px-3 py-2 rounded-md"
-                    >
-                      {devices.filter(d => d.kind === 'audioinput').map(d => (
-                        <option key={d.deviceId} value={d.deviceId}>{d.label || 'Micrófono ' + d.deviceId}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <button
-                  onClick={startStream}
-                  className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
-                >
-                  Iniciar Transmisión
-                </button>
+            {isRecording && (
+              <div className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-red-600/20 border border-red-500 text-red-500 backdrop-blur-md w-fit">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest">Grabando: {formatTime(recordingTime)}</span>
               </div>
             )}
+          </div>
 
-            {isStreaming && (
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent flex justify-center gap-4">
-                <button
-                  onClick={toggleVideo}
-                  className={`p-4 rounded-full transition-colors ${videoEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+          <div className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-4 px-4 sm:px-8 py-2 sm:py-4 bg-black/40 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl z-10 w-[90%] sm:w-auto justify-center">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <button 
+                onClick={toggleMute}
+                disabled={!stream}
+                className={`p-3 sm:p-4 rounded-full transition-all disabled:opacity-50 ${isMuted ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title={isMuted ? "Activar Micrófono" : "Silenciar Micrófono"}
+              >
+                {isMuted ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6" />}
+              </button>
+              <button 
+                onClick={toggleVideo}
+                disabled={!stream}
+                className={`p-3 sm:p-4 rounded-full transition-all disabled:opacity-50 ${isVideoOff ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title={isVideoOff ? "Activar Cámara" : "Desactivar Cámara"}
+              >
+                {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
+              </button>
+              <button 
+                onClick={flipCamera}
+                disabled={!stream}
+                className="p-3 sm:p-4 rounded-full transition-all disabled:opacity-50 bg-white/10 text-white hover:bg-white/20"
+                title="Voltear Cámara"
+              >
+                <FlipHorizontal className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+
+            <div className="w-px h-6 sm:h-8 bg-white/10 mx-1 sm:mx-2" />
+
+            <div className="flex items-center gap-1 sm:gap-2">
+              {!isRecording ? (
+                <button 
+                  onClick={startRecording}
+                  disabled={!stream}
+                  className="p-3 sm:p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all disabled:opacity-50"
+                  title="Iniciar Grabación"
                 >
-                  {videoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                  <Circle className="w-5 h-5 sm:w-6 sm:h-6 fill-red-500 text-red-500" />
                 </button>
-                <button
-                  onClick={toggleAudio}
-                  className={`p-4 rounded-full transition-colors ${audioEnabled ? 'bg-zinc-800 hover:bg-zinc-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+              ) : (
+                <button 
+                  onClick={stopRecording}
+                  className="p-3 sm:p-4 rounded-full bg-red-500 text-white hover:bg-red-600 transition-all"
+                  title="Detener Grabación"
                 >
-                  {audioEnabled ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+                  <Square className="w-5 h-5 sm:w-6 sm:h-6 fill-white" />
                 </button>
-                {!isScreenSharing ? (
-                  <button
-                    onClick={startScreenShare}
-                    className="px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-full transition-colors"
+              )}
+            </div>
+
+            <div className="w-px h-6 sm:h-8 bg-white/10 mx-1 sm:mx-2" />
+
+            {!isLive ? (
+              <button 
+                onClick={startBroadcast}
+                className="px-4 sm:px-8 py-3 sm:py-4 bg-brand-primary hover:bg-brand-primary/80 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-brand-primary/20 text-sm sm:text-base"
+              >
+                <Power className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Iniciar Transmisión</span>
+                <span className="sm:hidden">Iniciar</span>
+              </button>
+            ) : (
+              <button 
+                onClick={stopBroadcast}
+                className="px-4 sm:px-8 py-3 sm:py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-full transition-all flex items-center gap-2 shadow-lg shadow-red-600/20 text-sm sm:text-base"
+              >
+                <Power className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Detener Transmisión</span>
+                <span className="sm:hidden">Detener</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="w-full lg:w-96 bg-brand-surface border-l border-white/5 flex flex-col z-20">
+          <div className="p-6 border-b border-white/5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-brand-primary/20 text-brand-primary rounded-xl flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-white">Panel de Transmisión</h2>
+                  <p className="text-[10px] text-neutral-500 uppercase tracking-widest">{user?.name || "Locutor"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="p-2 text-neutral-500 hover:text-white transition-colors">
+                  <Settings className="w-5 h-5" />
+                </button>
+                {user ? (
+                  <button 
+                    onClick={handleLogout}
+                    className="p-2 text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                    title="Cerrar Sesión"
                   >
-                    Compartir Pantalla
+                    <LogOut className="w-5 h-5" />
                   </button>
                 ) : (
-                  <button
-                    onClick={stopScreenShare}
-                    className="px-4 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-medium rounded-full transition-colors"
+                  <button 
+                    onClick={() => { stopBroadcast(); navigate("/"); }}
+                    className="p-2 text-neutral-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                    title="Salir"
                   >
-                    Detener Compartir
+                    <LogOut className="w-5 h-5" />
                   </button>
                 )}
-                <button
-                  onClick={stopStream}
-                  className="px-6 py-4 bg-red-600 hover:bg-red-500 text-white font-medium rounded-full transition-colors ml-4"
-                >
-                  Detener Transmisión
-                </button>
+              </div>
+            </div>
+            
+            {!isLive && (
+              <div className="mt-2">
+                <label className="text-xs text-neutral-400 font-bold uppercase tracking-widest mb-2 block">Nombre de la transmisión</label>
+                <input
+                  type="text"
+                  value={streamName}
+                  onChange={(e) => setStreamName(e.target.value)}
+                  placeholder="Ej. Fiesta Patronal 2026"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-brand-primary/50 transition-all"
+                />
               </div>
             )}
           </div>
-          {/* Floating chat: se posiciona sobre el video a la derecha */}
-          <div className="fixed right-6 top-6 w-96 max-h-[70vh] z-50 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden">
-            <Chat socket={socket} isHost={true} />
+
+          {/* Chat */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Chat socket={socketRef.current} isHost={true} />
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

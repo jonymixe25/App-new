@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (request.auth.token.email == "mixecultura25@gmail.com" || 
+             (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.role in ['admin', 'user'] && data.email is string && data.email.size() < 255;
+    }
+
+    function isValidNews(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 50000 &&
+             data.author is string && data.author.size() > 0 && data.author.size() < 100 &&
+             data.date is string &&
+             (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() < 1000)) &&
+             (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() < 1000));
+    }
+
+    function isValidCommunityVideo(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.author is string && data.author.size() > 0 && data.author.size() < 100 &&
+             data.thumbnail is string && data.thumbnail.size() > 0 && data.thumbnail.size() < 1000 &&
+             data.price is string && data.price.size() > 0 && data.price.size() < 50 &&
+             data.video_url is string && data.video_url.size() > 0 && data.video_url.size() < 1000 &&
+             data.published is bool;
+    }
+
+    function isValidTeamMember(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.role is string && data.role.size() > 0 && data.role.size() < 100 &&
+             data.bio is string && data.bio.size() < 2000 &&
+             data.image is string && data.image.size() < 1000 &&
+             data.icon is string && data.icon.size() < 50 &&
+             (!('linkedin' in data) || data.linkedin == null || (data.linkedin is string && data.linkedin.size() < 1000)) &&
+             (!('twitter' in data) || data.twitter == null || (data.twitter is string && data.twitter.size() < 1000)) &&
+             (!('github' in data) || data.github == null || (data.github is string && data.github.size() < 1000)) &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() < 100));
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && hasOnlyAllowedFields(['role', 'email']) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isOwner(userId) && hasOnlyAllowedFields(['role', 'email']) && isValidUser(request.resource.data) && areImmutableFieldsUnchanged(['role']) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create: if isAdmin() && hasOnlyAllowedFields(['title', 'content', 'author', 'date', 'imageUrl', 'videoUrl']) && isValidNews(request.resource.data);
+      allow update: if isAdmin() && hasOnlyAllowedFields(['title', 'content', 'author', 'date', 'imageUrl', 'videoUrl']) && isValidNews(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /community_videos/{videoId} {
+      allow read: if true;
+      allow create: if isAdmin() && hasOnlyAllowedFields(['title', 'author', 'thumbnail', 'price', 'video_url', 'published']) && isValidCommunityVideo(request.resource.data);
+      allow update: if isAdmin() && hasOnlyAllowedFields(['title', 'author', 'thumbnail', 'price', 'video_url', 'published']) && isValidCommunityVideo(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /team/{memberId} {
+      allow read: if true;
+      allow create: if isAdmin() && hasOnlyAllowedFields(['name', 'role', 'bio', 'image', 'icon', 'linkedin', 'twitter', 'github', 'email']) && isValidTeamMember(request.resource.data);
+      allow update: if isAdmin() && hasOnlyAllowedFields(['name', 'role', 'bio', 'image', 'icon', 'linkedin', 'twitter', 'github', 'email']) && isValidTeamMember(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}

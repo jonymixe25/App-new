@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "NewsItem": {
+      "title": "NewsItem",
+      "description": "A news article",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "videoUrl": { "type": "string" }
+      },
+      "required": ["title", "content", "author", "date"]
+    },
+    "CommunityVideo": {
+      "title": "CommunityVideo",
+      "description": "A community video",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "price": { "type": "string" },
+        "video_url": { "type": "string" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["title", "author", "thumbnail", "price", "video_url", "published"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "A team member",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "bio": { "type": "string" },
+        "image": { "type": "string" },
+        "icon": { "type": "string" },
+        "linkedin": { "type": "string" },
+        "twitter": { "type": "string" },
+        "github": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["name", "role", "bio", "image", "icon"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user profile",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "email": { "type": "string" }
+      },
+      "required": ["role", "email"]
+    }
+  },
+  "firestore": {
+    "news": {
+      "schema": { "$ref": "#/entities/NewsItem" },
+      "description": "News articles"
+    },
+    "community_videos": {
+      "schema": { "$ref": "#/entities/CommunityVideo" },
+      "description": "Community videos"
+    },
+    "team": {
+      "schema": { "$ref": "#/entities/TeamMember" },
+      "description": "Team members"
+    },
+    "users": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and roles"
+    }
+  }
+}

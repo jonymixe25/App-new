@@ -1,5 +1,5 @@
 {
-  "name": "Live Stream App",
-  "description": "Aplicación para transmitir video en vivo desde la cámara y micrófono, y poder incrustarlo en cualquier página web.",
+  "name": "Vida Mixe TV | vidamixe.mx",
+  "description": "Plataforma oficial de Vida Mixe TV (vidamixe.mx). Conectando a la comunidad Ayuuk a través de transmisiones en vivo, noticias y herramientas de traducción bilingüe.",
   "requestFramePermissions": ["camera", "microphone"]
 }
